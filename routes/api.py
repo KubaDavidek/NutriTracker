@@ -6,7 +6,7 @@ import unicodedata
 from datetime import date, timedelta
 from flask import Blueprint, jsonify, request, session
 
-from utils.json_db    import (FOODS_FILE, load_table, get_log, compute_day_totals)
+from utils.json_db    import (FOODS_FILE, load_table, get_log, compute_day_totals, _fetch_all)
 from utils.auth_utils import login_required
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
@@ -67,19 +67,67 @@ def history():
     """
     Vrátí denní součty za posledních N dní.
     Používá se pro Chart.js (grafická historie).
+    Optimalizováno: 3 SQL dotazy místo 28.
     """
     days_count = int(request.args.get("days", 7))
     user_id    = session["user_id"]
     today      = date.today()
+    start_date = (today - timedelta(days=days_count - 1)).isoformat()
+
+    # 1 dotaz: všechny logy v rozsahu
+    logs = _fetch_all(
+        "SELECT id, date FROM logs WHERE user_id=%s AND date>=%s AND date<=%s",
+        (user_id, start_date, today.isoformat())
+    )
+    log_map = {str(r["date"]): str(r["id"]) for r in logs}
+    log_ids = list(log_map.values())
+
+    # 2 dotazy: všechny meal_entries a aktivity najednou
+    if log_ids:
+        ph = ",".join(["%s"] * len(log_ids))
+        meals = _fetch_all(
+            f"SELECT log_id, kcal, protein, carbs, fat, grams FROM meal_entries WHERE log_id IN ({ph})",
+            log_ids
+        )
+        acts = _fetch_all(
+            f"SELECT log_id, calories_burned FROM activities WHERE log_id IN ({ph})",
+            log_ids
+        )
+    else:
+        meals, acts = [], []
+
+    # Agregace per log_id
+    from collections import defaultdict
+    meal_totals = defaultdict(lambda: {"kcal": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0})
+    for m in meals:
+        lid = str(m["log_id"])
+        g = float(m.get("grams") or 100) / 100
+        meal_totals[lid]["kcal"]    += float(m.get("kcal") or 0) * g
+        meal_totals[lid]["protein"] += float(m.get("protein") or 0) * g
+        meal_totals[lid]["carbs"]   += float(m.get("carbs") or 0) * g
+        meal_totals[lid]["fat"]     += float(m.get("fat") or 0) * g
+
+    act_totals = defaultdict(float)
+    for a in acts:
+        act_totals[str(a["log_id"])] += float(a.get("calories_burned") or 0)
 
     result = []
     for i in range(days_count - 1, -1, -1):
-        d      = (today - timedelta(days=i)).isoformat()
-        log    = get_log(user_id, d)
-        totals = compute_day_totals(log) if log else {
-            "kcal": 0, "protein": 0, "carbs": 0, "fat": 0,
-            "calories_burned": 0, "balance": 0,
-        }
+        d = (today - timedelta(days=i)).isoformat()
+        lid = log_map.get(d)
+        if lid:
+            t = meal_totals[lid]
+            burned = act_totals[lid]
+            totals = {
+                "kcal":            round(t["kcal"]),
+                "protein":         round(t["protein"], 1),
+                "carbs":           round(t["carbs"], 1),
+                "fat":             round(t["fat"], 1),
+                "calories_burned": round(burned),
+                "balance":         round(t["kcal"] - burned),
+            }
+        else:
+            totals = {"kcal": 0, "protein": 0, "carbs": 0, "fat": 0, "calories_burned": 0, "balance": 0}
         result.append({"date": d, "totals": totals})
 
     return jsonify(result)
