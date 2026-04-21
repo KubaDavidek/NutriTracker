@@ -177,11 +177,25 @@ def _log_from_rows(log_row: Dict, meal_rows: list, activity_rows: list, water_ro
     }
 
 
+# ── In-memory cache (foods + recipes se nemění za běhu) ──────────────────────
+_CACHE: Dict[str, List[Dict]] = {}
+
+def _cache_get(key: str):
+    return _CACHE.get(key)
+
+def _cache_set(key: str, value: List[Dict]):
+    _CACHE[key] = value
+
 # ── load_table ────────────────────────────────────────────────────────────────
 
 def load_table(path: str) -> List[Dict]:
     if path == FOODS_FILE:
-        return _fetch_all("SELECT * FROM foods")
+        cached = _cache_get("foods")
+        if cached is not None:
+            return cached
+        data = _fetch_all("SELECT * FROM foods")
+        _cache_set("foods", data)
+        return data
     if path == USERS_FILE:
         return [_user_from_row(r) for r in _fetch_all("SELECT * FROM users")]
     if path == MESSAGES_FILE:
@@ -531,10 +545,14 @@ def get_my_advisors(client_id: str) -> List[Dict]:
 
 def get_all_recipes_db() -> List[Dict]:
     """Načte všechny recepty z tabulky recipes."""
+    cached = _cache_get("recipes")
+    if cached is not None:
+        return cached
     rows = _fetch_all("SELECT * FROM recipes ORDER BY kcal ASC")
     for r in rows:
         r["tags"]        = r.get("tags") or []
         r["ingredients"] = r.get("ingredients") or []
+    _cache_set("recipes", rows)
     return rows
 
 
