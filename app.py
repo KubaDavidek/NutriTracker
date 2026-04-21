@@ -54,24 +54,34 @@ def create_app() -> Flask:
 
     # ── Globální context: počet nepřečtených zpráv (pro nav badge) ───────────
     from flask import session as _session
-    from utils.json_db import MESSAGES_FILE, find_all as _find_all
+    from utils.json_db import _fetch_one
 
     @app.context_processor
     def inject_unread():
         uid = _session.get("user_id")
         if uid:
-            count = len(_find_all(MESSAGES_FILE,
-                                  lambda m: m["client_id"] == uid
-                                            and not m.get("read")))
+            try:
+                row = _fetch_one(
+                    "SELECT COUNT(*) AS cnt FROM messages WHERE client_id=%s AND is_read=false AND sender='advisor'",
+                    (uid,)
+                )
+                count = int(row["cnt"]) if row else 0
+            except Exception:
+                count = 0
         else:
             count = 0
         return {"nav_unread": count}
 
     # ── Kořenová přesměrování ─────────────────────────────────────────────────
-    from flask import redirect, url_for
+    from flask import redirect, url_for, jsonify
     @app.route("/")
     def index():
         return redirect(url_for("dashboard.index"))
+
+    # ── Keep-alive ping (zabraňuje uspání na Render free tier) ───────────────
+    @app.route("/ping")
+    def ping():
+        return jsonify({"ok": True}), 200
 
     return app
 
