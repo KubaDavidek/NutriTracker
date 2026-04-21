@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Zprávy – NutriTracker{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0">
+    <i class="bi bi-chat-dots-fill text-primary"></i> Zprávy s poradcem
+  </h4>
+</div>
+
+{% if not my_advisors %}
+  <div class="card border-0 shadow-sm">
+    <div class="card-body text-center py-5 text-muted">
+      <i class="bi bi-person-badge fs-1 d-block mb-3 opacity-50"></i>
+      Zatím nemáte žádného přijatého poradce.<br>
+      <span class="small">Poradce vás musí nejdříve pozvat – pozvánku přijmete na dashboardu.</span>
+    </div>
+  </div>
+{% else %}
+
+{% for adv in my_advisors %}
+{% set adv_msgs = conversations.get(adv.advisor_id, []) %}
+
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2">
+    <i class="bi bi-person-badge text-success"></i> {{ adv.advisor_email }}
+  </div>
+
+  <!-- Oblast zpráv -->
+  <div class="card-body p-3" id="chat-{{ adv.advisor_id }}"
+       style="max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:.6rem;">
+    {% if adv_msgs %}
+      {% for msg in adv_msgs %}
+      {% if msg.sender == 'client' %}
+      <!-- Klient → vpravo -->
+      <div class="d-flex justify-content-end">
+        <div class="rounded-3 px-3 py-2" style="max-width:75%;background:var(--bs-primary);color:#fff;font-size:.92rem;">
+          <div>{{ msg.text }}</div>
+          <div class="mt-1 text-end" style="font-size:.72rem;opacity:.75">
+            <i class="bi bi-check2{% if msg.read %}-all{% endif %}"></i>
+            {{ msg.timestamp }}
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <!-- Poradce → vlevo -->
+      <div class="d-flex justify-content-start">
+        <div class="rounded-3 px-3 py-2" style="max-width:75%;background:var(--nt-card);border:1px solid rgba(255,255,255,.1);font-size:.92rem;">
+          <div class="small fw-semibold text-success mb-1">
+            <i class="bi bi-person-badge me-1"></i>{{ msg.advisor_email }}
+          </div>
+          <div>{{ msg.text }}</div>
+          <div class="mt-1" style="font-size:.72rem;opacity:.55">{{ msg.timestamp }}</div>
+        </div>
+      </div>
+      {% endif %}
+      {% endfor %}
+    {% else %}
+      <div class="text-muted text-center fst-italic py-3 small">Zatím žádné zprávy s tímto poradcem.</div>
+    {% endif %}
+  </div>
+
+  <!-- Formulář pro odeslání -->
+  <div class="card-footer bg-transparent border-top">
+    <form method="POST" action="{{ url_for('dashboard.send_message_to_advisor') }}"
+          class="d-flex gap-2 align-items-end">
+      <input type="hidden" name="advisor_id" value="{{ adv.advisor_id }}">
+      <textarea name="text" class="form-control form-control-sm"
+                placeholder="Napište zprávu poradci…" rows="2" required
+                style="resize:none;"></textarea>
+      <button type="submit" class="btn btn-primary btn-sm px-3">
+        <i class="bi bi-send-fill"></i>
+      </button>
+    </form>
+  </div>
+</div>
+{% endfor %}
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Scroll na konec při načtení
+document.querySelectorAll('[id^="chat-"]').forEach(function(el) {
+  el.scrollTop = el.scrollHeight;
+});
+
+// Polling pro každou konverzaci
+var advisors = [
+  {% for adv in my_advisors %}
+  {
+    advisor_id: "{{ adv.advisor_id }}",
+    advisor_email: "{{ adv.advisor_email }}",
+    pollUrl: "{{ url_for('dashboard.messages_json', advisor_id=adv.advisor_id) }}",
+    lastCount: {{ conversations.get(adv.advisor_id, []) | length }}
+  }{% if not loop.last %},{% endif %}
+  {% endfor %}
+];
+
+function buildBubble(msg, advisorEmail) {
+  var isClient = msg.sender === 'client';
+  var time = msg.timestamp || '';
+  if (isClient) {
+    var check = msg.read ? 'bi-check2-all' : 'bi-check2';
+    return '<div class="d-flex justify-content-end">' +
+      '<div class="rounded-3 px-3 py-2" style="max-width:75%;background:var(--bs-primary);color:#fff;font-size:.92rem;">' +
+      '<div>' + msg.text + '</div>' +
+      '<div class="mt-1 text-end" style="font-size:.72rem;opacity:.75"><i class="bi ' + check + '"></i> ' + time + '</div>' +
+      '</div></div>';
+  } else {
+    return '<div class="d-flex justify-content-start">' +
+      '<div class="rounded-3 px-3 py-2" style="max-width:75%;background:var(--nt-card);border:1px solid rgba(255,255,255,.1);font-size:.92rem;">' +
+      '<div class="small fw-semibold text-success mb-1"><i class="bi bi-person-badge me-1"></i>' + advisorEmail + '</div>' +
+      '<div>' + msg.text + '</div>' +
+      '<div class="mt-1" style="font-size:.72rem;opacity:.55">' + time + '</div>' +
+      '</div></div>';
+  }
+}
+
+advisors.forEach(function(adv) {
+  setInterval(function() {
+    fetch(adv.pollUrl)
+      .then(function(r){ return r.json(); })
+      .then(function(msgs) {
+        if (msgs.length !== adv.lastCount) {
+          adv.lastCount = msgs.length;
+          var area = document.getElementById('chat-' + adv.advisor_id);
+          if (!area) return;
+          var atBottom = area.scrollHeight - area.scrollTop - area.clientHeight < 60;
+          area.innerHTML = msgs.length
+            ? msgs.map(function(m){ return buildBubble(m, adv.advisor_email); }).join('')
+            : '<div class="text-muted text-center fst-italic py-3 small">Zatím žádné zprávy s tímto poradcem.</div>';
+          if (atBottom) area.scrollTop = area.scrollHeight;
+        }
+      })
+      .catch(function(){});
+  }, 3000);
+});
+</script>
+{% endblock %}

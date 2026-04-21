@@ -1,0 +1,382 @@
+{% extends "base.html" %}
+{% block title %}Klient: {{ client.email }} – {{ day }}{% endblock %}
+
+{% block content %}
+<!-- ── Hlavička ──────────────────────────────────────────────────────────────── -->
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div class="d-flex align-items-center gap-2">
+    <a href="{{ url_for('advisor.index') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Zpět
+    </a>
+    <div>
+      <h5 class="mb-0">
+        <i class="bi bi-person-circle text-secondary"></i>
+        {{ client.email }}
+        {% if client.is_premium %}
+          <span class="badge bg-warning text-dark ms-1">
+            <i class="bi bi-star-fill"></i> Premium
+          </span>
+        {% endif %}
+      </h5>
+      <div class="text-muted small">Denní přehled klienta</div>
+    </div>
+  </div>
+
+  <!-- Navigace dny -->
+  <div class="d-flex align-items-center gap-1">
+    <a href="{{ url_for('advisor.client_detail', client_id=client.id, date=prev_day) }}"
+       class="btn btn-sm btn-outline-secondary" title="Předchozí den">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+    <form method="GET" action="{{ url_for('advisor.client_detail', client_id=client.id) }}"
+          class="d-flex align-items-center gap-1">
+      <input type="date" class="form-control form-control-sm" name="date"
+             value="{{ day }}" onchange="this.form.submit()" style="min-width:140px"/>
+    </form>
+    <a href="{{ url_for('advisor.client_detail', client_id=client.id, date=next_day) }}"
+       class="btn btn-sm btn-outline-secondary" title="Následující den">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+    <a href="{{ url_for('advisor.client_detail', client_id=client.id) }}"
+       class="btn btn-sm btn-outline-success ms-1" title="Dnes">
+      <i class="bi bi-calendar-today"></i>
+    </a>
+  </div>
+</div>
+
+<!-- ── Cíle vs skutečnost ─────────────────────────────────────────────────── -->
+<div class="card mb-4 border-0 border-start border-4 border-info" style="border-radius:8px">
+  <div class="card-header bg-info bg-opacity-15 fw-semibold">
+    <i class="bi bi-bullseye text-info"></i> Plnění cílů klienta
+  </div>
+  <div class="card-body pb-2">
+    <div class="row g-3">
+      {% set goal_items = [
+        ("Kalorie",   totals.kcal,    targets.kcal,    "success", "bi-fire"),
+        ("Bílkoviny", totals.protein, targets.protein, "primary", "bi-egg-fill"),
+        ("Sacharidy", totals.carbs,   targets.carbs,   "warning", "bi-lightning-charge-fill"),
+        ("Tuky",      totals.fat,     targets.fat,     "danger",  "bi-droplet-fill"),
+      ] %}
+      {% for label, val, tgt, col, ico in goal_items %}
+      {% set pct = [(val / tgt * 100) | round(0) | int, 110] | min if tgt > 0 else 0 %}
+      {% set bar_col = "danger" if pct > 100 else col %}
+      <div class="col-6 col-md-3">
+        <div class="d-flex justify-content-between small mb-1">
+          <span><i class="bi {{ ico }} text-{{ col }} me-1"></i>{{ label }}</span>
+          <span class="fw-semibold">{{ val }}{% if label != "Kalorie" %} g{% endif %}</span>
+        </div>
+        <div class="progress" style="height:8px">
+          <div class="progress-bar bg-{{ bar_col }}" style="width:{{ [pct, 100] | min }}%"></div>
+        </div>
+        <div class="text-muted mt-1" style="font-size:.7rem">
+          {{ pct }} % · cíl {{ tgt }}{% if label != "Kalorie" %} g{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- ── Součty ─────────────────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-2">
+    <div class="card text-center border-success">
+      <div class="card-body py-2">
+        <div class="fs-4 fw-bold text-success">{{ totals.kcal }}</div>
+        <div class="small text-muted">kcal příjem</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card text-center">
+      <div class="card-body py-2">
+        <div class="fs-5 fw-bold">{{ totals.protein }} g</div>
+        <div class="small text-muted">Bílkoviny</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card text-center">
+      <div class="card-body py-2">
+        <div class="fs-5 fw-bold">{{ totals.carbs }} g</div>
+        <div class="small text-muted">Sacharidy</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card text-center">
+      <div class="card-body py-2">
+        <div class="fs-5 fw-bold">{{ totals.fat }} g</div>
+        <div class="small text-muted">Tuky</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card text-center border-warning">
+      <div class="card-body py-2">
+        <div class="fs-5 fw-bold text-warning">{{ totals.calories_burned }}</div>
+        <div class="small text-muted">kcal výdej</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card text-center">
+      <div class="card-body py-2">
+        <div class="fs-5 fw-bold {% if totals.balance > 0 %}text-danger{% else %}text-success{% endif %}">
+          {{ totals.balance }}
+        </div>
+        <div class="small text-muted">Bilance</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- READ-ONLY jídla -->
+{% for slot_key, slot_label, slot_color in meal_slots %}
+<div class="card mb-3 border-0 border-start border-4 border-{{ slot_color }}" style="border-radius:8px">
+  <div class="card-header bg-{{ slot_color }} bg-opacity-25 fw-semibold text-center" style="border-radius:0 8px 0 0">
+    <i class="bi bi-bowl-hot text-{{ slot_color }}"></i> {{ slot_label }}
+  </div>
+  <ul class="list-group list-group-flush">
+    {% set slot_items = log.meals[slot_key] %}
+    {% if slot_items %}
+      {% for item in slot_items %}
+      <li class="list-group-item d-flex justify-content-between">
+        <span>
+          <strong>{{ item.name }}</strong>
+          <span class="text-muted small ms-2">{{ item.grams }} g</span>
+        </span>
+        <span class="badge bg-success">
+          {{ (item.kcal * item.grams / 100) | round(1) }} kcal
+        </span>
+      </li>
+      {% endfor %}
+    {% else %}
+      <li class="list-group-item text-muted small fst-italic">Prázdné.</li>
+    {% endif %}
+  </ul>
+</div>
+{% endfor %}
+
+<!-- Aktivity -->
+<div class="card mb-4">
+  <div class="card-header bg-light fw-semibold">
+    <i class="bi bi-lightning-charge text-warning"></i> Aktivity
+  </div>
+  <ul class="list-group list-group-flush">
+    {% if log.activities %}
+      {% for act in log.activities %}
+      <li class="list-group-item d-flex justify-content-between">
+        <span><strong>{{ act.name }}</strong></span>
+        <span class="badge bg-warning text-dark">−{{ act.calories_burned }} kcal</span>
+      </li>
+      {% endfor %}
+    {% else %}
+      <li class="list-group-item text-muted small fst-italic">Žádné aktivity.</li>
+    {% endif %}
+  </ul>
+</div>
+
+
+<!-- ── Mikroživiny ─────────────────────────────────────────────────────────── -->
+<div class="card border-0 border-start border-4 border-success mb-3" style="border-radius:8px">
+  <div class="card-header bg-success bg-opacity-25 fw-semibold position-relative d-flex align-items-center justify-content-center"
+       style="border-radius:0 8px 0 0; min-height:2.6rem">
+    <span><i class="bi bi-capsule text-success me-1"></i> Mikroživiny dnes</span>
+  </div>
+  <div class="card-body pb-2">
+    <p class="text-muted small mb-3">
+      <i class="bi bi-info-circle me-1"></i>
+      Orientační odhad z denního příjmu klienta · DDD = doporučená denní dávka.
+    </p>
+    <div class="row g-2">
+      {% set micro_items = [
+        ("Cukry",        micros.get("sugars",      0)|round(1), 50,   "g",  "bg-danger",   "bi-droplet-fill text-danger"),
+        ("Vláknina",     micros.get("fiber",       0)|round(1), 28,   "g",  "bg-success",  "bi-tree-fill text-success"),
+        ("Vitamín C",    micros.get("vitamin_c",   0)|round(1), 90,   "mg", "bg-warning",  "bi-sun-fill text-warning"),
+        ("Vitamín B12",  micros.get("vitamin_b12", 0)|round(2), 2.4,  "µg", "bg-info",     "bi-stars text-info"),
+        ("Nasyc. tuky",  micros.get("sat_fat",     0)|round(1), 20,   "g",  "bg-secondary","bi-exclamation-circle text-secondary"),
+      ] %}
+      {% for label, val, dv, unit, bar_cls, icon_cls in micro_items %}
+      <div class="col-6 col-md-4 col-lg-2">
+        <div class="card h-100 border-0 shadow-sm">
+          <div class="card-body p-2">
+            <div class="small fw-semibold mb-1">
+              <i class="bi {{ icon_cls }} me-1"></i>{{ label }}
+            </div>
+            <div class="fs-6 fw-bold">{{ val }}<span class="text-muted fw-normal small ms-1">{{ unit }}</span></div>
+            <div class="progress mt-1 mb-1" style="height:5px;">
+              {% set pct = [(val / dv * 100) | round(0) | int, 100] | min if dv > 0 else 0 %}
+              <div class="progress-bar {{ bar_cls }}" style="width:{{ pct }}%"></div>
+            </div>
+            <div class="text-muted" style="font-size:.7rem;">{{ pct }} % / {{ dv }} {{ unit }}</div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- ── Minerály ────────────────────────────────────────────────────────────── -->
+<div class="card border-0 border-start border-4 border-primary mb-3" style="border-radius:8px">
+  <div class="card-header bg-primary bg-opacity-25 fw-semibold text-center"
+       style="border-radius:0 8px 0 0">
+    <i class="bi bi-gem text-primary me-1"></i> Minerály &amp; elektrolyty dnes
+  </div>
+  <div class="card-body pb-2">
+    <div class="row g-2">
+      {% set mineral_items = [
+        ("Sodík (Na)",   micros.get("sodium",     0)|int,     2300, "mg", "bg-info",     "bi-dash-circle-fill text-info",         "Krevní tlak, hydratace"),
+        ("Vápník (Ca)",  micros.get("calcium",    0)|int,     1300, "mg", "bg-primary",  "bi-layers-fill text-primary",           "Kosti, zuby, svaly"),
+        ("Železo (Fe)",  micros.get("iron",       0)|round(1), 18,  "mg", "bg-danger",   "bi-droplet-fill text-danger",           "Červené krvinky, kyslík"),
+        ("Draslík (K)",  micros.get("potassium",  0)|int,     4700, "mg", "bg-success",  "bi-cpu-fill text-success",              "Srdeční rytmus, svaly"),
+        ("Hořčík (Mg)",  micros.get("magnesium",  0)|int,      420, "mg", "bg-warning",  "bi-lightning-charge-fill text-warning", "Nervy, energetický metabolismus"),
+        ("Fosfor (P)",   micros.get("phosphorus", 0)|int,     1250, "mg", "bg-secondary","bi-record-circle text-secondary",       "Kosti, buněčná energie"),
+      ] %}
+      {% for label, val, dv, unit, bar_cls, icon_cls, desc in mineral_items %}
+      <div class="col-12 col-md-6 col-lg-4">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-body p-2 d-flex flex-column">
+            <div class="d-flex justify-content-between align-items-start mb-1">
+              <div>
+                <span class="fw-semibold small"><i class="bi {{ icon_cls }} me-1"></i>{{ label }}</span>
+                <div class="text-muted" style="font-size:.7rem;">{{ desc }}</div>
+              </div>
+              <span class="fw-bold">{{ val | int }}<span class="text-muted fw-normal small ms-1">{{ unit }}</span></span>
+            </div>
+            <div class="progress mt-auto" style="height:7px;">
+              {% set pct = [(val / dv * 100) | round(0) | int, 100] | min if dv > 0 else 0 %}
+              <div class="progress-bar {{ bar_cls }}" style="width:{{ pct }}%"></div>
+            </div>
+            <div class="text-muted mt-1" style="font-size:.7rem;">{{ pct }} % DDD · max {{ dv }} {{ unit }}</div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- ── Zprávy ──────────────────────────────────────────────────────────────── -->
+<div class="card mb-4 border-0 border-start border-4 border-primary" style="border-radius:8px">
+  <div class="card-header bg-primary bg-opacity-25 fw-semibold d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-chat-dots-fill text-primary"></i> Konverzace s klientem</span>
+    {% set unread_count = messages | selectattr("sender", "equalto", "client") | selectattr("read", "equalto", false) | list | length %}
+    {% if unread_count > 0 %}
+      <span class="badge bg-danger">{{ unread_count }} nových</span>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    <!-- Oblast zpráv -->
+    <div id="chat-area"
+         style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:.6rem;margin-bottom:.75rem;">
+      {% if messages %}
+        {% for msg in messages %}
+        {% if msg.sender == 'client' %}
+        <!-- Klient → vlevo -->
+        <div class="d-flex justify-content-start">
+          <div class="rounded-3 px-3 py-2" style="max-width:75%;background:var(--nt-card);border:1px solid rgba(255,255,255,.1);font-size:.92rem;">
+            <div class="small fw-semibold text-warning mb-1">
+              <i class="bi bi-person-circle me-1"></i>{{ client.email }}
+            </div>
+            <div>{{ msg.text }}</div>
+            <div class="mt-1" style="font-size:.72rem;opacity:.55">{{ msg.timestamp }}</div>
+          </div>
+        </div>
+        {% else %}
+        <!-- Poradce → vpravo -->
+        <div class="d-flex justify-content-end">
+          <div class="d-flex gap-2 align-items-start">
+            <div class="rounded-3 px-3 py-2" style="max-width:100%;background:var(--bs-primary);color:#fff;font-size:.92rem;">
+              <div>{{ msg.text }}</div>
+              <div class="mt-1 text-end" style="font-size:.72rem;opacity:.75">
+                <i class="bi bi-check2{% if msg.read %}-all{% endif %}"></i>
+                {{ msg.timestamp }}
+              </div>
+            </div>
+            <form method="POST"
+                  action="{{ url_for('advisor.delete_message', msg_id=msg.id) }}"
+                  class="flex-shrink-0 align-self-center">
+              <input type="hidden" name="client_id" value="{{ client.id }}">
+              <button class="btn btn-sm btn-outline-danger" title="Smazat"
+                      onclick="return confirm('Smazat tuto zprávu?')">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+      {% else %}
+        <p class="text-muted small fst-italic text-center mb-0">
+          <i class="bi bi-chat-square-dots me-1"></i>Zatím žádné zprávy.
+        </p>
+      {% endif %}
+    </div>
+
+    <!-- Formulář pro novou zprávu -->
+    <form method="POST" action="{{ url_for('advisor.send_message', client_id=client.id) }}"
+          class="d-flex gap-2 align-items-end">
+      <textarea name="text" class="form-control form-control-sm"
+                placeholder="Napište zprávu klientovi…" rows="2" required
+                style="resize:none;"></textarea>
+      <button class="btn btn-primary" type="submit">
+        <i class="bi bi-send-fill"></i> Odeslat
+      </button>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+var chatArea = document.getElementById('chat-area');
+if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
+
+var clientId   = "{{ client.id }}";
+var clientEmail = "{{ client.email }}";
+var pollUrl    = "{{ url_for('advisor.messages_json', client_id=client.id) }}";
+var lastCount  = {{ messages | length }};
+
+function buildBubble(msg) {
+  var isClient = msg.sender === 'client';
+  var time = msg.timestamp || '';
+  if (isClient) {
+    return '<div class="d-flex justify-content-start">' +
+      '<div class="rounded-3 px-3 py-2" style="max-width:75%;background:var(--nt-card);border:1px solid rgba(255,255,255,.1);font-size:.92rem;">' +
+      '<div class="small fw-semibold text-warning mb-1"><i class="bi bi-person-circle me-1"></i>' + clientEmail + '</div>' +
+      '<div>' + msg.text + '</div>' +
+      '<div class="mt-1" style="font-size:.72rem;opacity:.55">' + time + '</div>' +
+      '</div></div>';
+  } else {
+    var check = msg.read ? 'bi-check2-all' : 'bi-check2';
+    return '<div class="d-flex justify-content-end">' +
+      '<div class="d-flex gap-2 align-items-start">' +
+      '<div class="rounded-3 px-3 py-2" style="max-width:100%;background:var(--bs-primary);color:#fff;font-size:.92rem;">' +
+      '<div>' + msg.text + '</div>' +
+      '<div class="mt-1 text-end" style="font-size:.72rem;opacity:.75"><i class="bi ' + check + '"></i> ' + time + '</div>' +
+      '</div></div></div>';
+  }
+}
+
+function pollMessages() {
+  fetch(pollUrl)
+    .then(function(r){ return r.json(); })
+    .then(function(msgs) {
+      if (msgs.length !== lastCount) {
+        lastCount = msgs.length;
+        var area = document.getElementById('chat-area');
+        if (!area) return;
+        var atBottom = area.scrollHeight - area.scrollTop - area.clientHeight < 60;
+        area.innerHTML = msgs.map(buildBubble).join('');
+        if (atBottom) area.scrollTop = area.scrollHeight;
+      }
+    })
+    .catch(function(){});
+}
+
+setInterval(pollMessages, 3000);
+</script>
+{% endblock %}

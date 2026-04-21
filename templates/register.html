@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Registrace – NutriTracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-5">
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <h4 class="card-title mb-4 text-center">
+          <i class="bi bi-person-plus text-success"></i> Registrace
+        </h4>
+
+        <form method="POST" action="{{ url_for('auth.register') }}" novalidate>
+          <div class="mb-3">
+            <label for="name" class="form-label">Jméno a příjmení</label>
+            <input type="text" class="form-control" id="name" name="name"
+                   placeholder="Jan Novák" required autofocus/>
+          </div>
+
+          <div class="mb-3">
+            <label for="email" class="form-label">E-mail</label>
+            <input type="email" class="form-control" id="email" name="email"
+                   placeholder="vas@email.cz" required/>
+          </div>
+
+          <div class="mb-3">
+            <label for="password" class="form-label">Heslo</label>
+            <input type="password" class="form-control" id="password"
+                   name="password" minlength="6" required/>
+            <div class="form-text">Minimálně 6 znaků.</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="password2" class="form-label">Heslo znovu</label>
+            <input type="password" class="form-control" id="password2"
+                   name="password2" minlength="6" required/>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Role</label>
+            <select class="form-select" name="role">
+              <option value="user" selected>Uživatel</option>
+              <option value="advisor">Poradce</option>
+            </select>
+          </div>
+
+          <div class="d-grid mt-4">
+            <button type="submit" class="btn btn-success btn-lg">
+              <i class="bi bi-check-circle"></i> Registrovat se
+            </button>
+          </div>
+        </form>
+
+        <hr/>
+        <p class="text-center mb-0">
+          Již máš účet?
+          <a href="{{ url_for('auth.login') }}">Přihlaš se</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

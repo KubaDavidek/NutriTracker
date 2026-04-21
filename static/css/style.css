@@ -1,0 +1,527 @@
+/* NutriTracker – vlastní styly (doplňují Bootstrap 5) */
+
+:root {
+  --nt-blue:        #0d6efd;
+  --nt-blue-mid:    #3d8bfd;
+  --nt-blue-light:  #cfe2ff;
+  --nt-blue-dark:   #084298;
+  --nt-bg:          #0f1623;
+  --nt-card:        #161e2e;
+  --nt-card-border: #1e2d45;
+  --nt-text:        #e2e8f0;
+  --nt-muted:       #7a8faa;
+}
+
+/* ── Body & layout ────────────────────────────────────────────────────── */
+body {
+  background-color: var(--nt-bg);
+  color: var(--nt-text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+main.container {
+  flex: 1;
+}
+
+/* ── Navbar ───────────────────────────────────────────────────────────── */
+.navbar-brand {
+  font-size: 1.3rem;
+  letter-spacing: .5px;
+}
+.navbar.bg-primary {
+  background: linear-gradient(90deg, #0a1628 0%, #0d2a5e 100%) !important;
+  border-bottom: 1px solid var(--nt-card-border);
+}
+
+/* ── Karty ────────────────────────────────────────────────────────────── */
+.card {
+  background-color: var(--nt-card);
+  border: 1px solid var(--nt-card-border);
+  border-radius: .7rem;
+  color: var(--nt-text);
+}
+
+.card-header {
+  border-radius: .7rem .7rem 0 0 !important;
+  background-color: rgba(13, 110, 253, 0.07) !important;
+  border-bottom: 1px solid var(--nt-card-border);
+  color: var(--nt-text);
+}
+
+.card.bg-light,
+.card-header.bg-light {
+  background-color: rgba(255,255,255,0.04) !important;
+  color: var(--nt-text) !important;
+}
+
+/* ── Součtové karty na dashboardu ─────────────────────────────────────── */
+.card .fs-4.fw-bold {
+  line-height: 1.1;
+}
+
+/* ── Progress bary (makra) ────────────────────────────────────────────── */
+.nt-progress {
+  height: 12px;
+  border-radius: 6px;
+  background-color: rgba(255,255,255,0.08);
+  overflow: hidden;
+}
+.nt-progress .progress-bar {
+  border-radius: 6px;
+  transition: width 1s cubic-bezier(.4,0,.2,1);
+  will-change: width;
+}
+/* Animate from 0 on load */
+.nt-progress .progress-bar.nt-animated {
+  animation: ntGrow 1s cubic-bezier(.4,0,.2,1) forwards;
+}
+@keyframes ntGrow {
+  from { width: 0 !important; }
+}
+
+/* ── Premium badge ────────────────────────────────────────────────────── */
+.badge.bg-warning {
+  font-size: .75rem;
+}
+
+/* ── Tabulka ──────────────────────────────────────────────────────────── */
+.table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--nt-text);
+  --bs-table-striped-bg: rgba(13,110,253,0.05);
+  --bs-table-hover-bg: rgba(13,110,253,0.08);
+  --bs-table-border-color: var(--nt-card-border);
+}
+.table th {
+  font-size: .85rem;
+  white-space: nowrap;
+  color: var(--nt-muted);
+}
+.table-light, .table thead.table-light th {
+  background-color: rgba(255,255,255,0.04) !important;
+  color: var(--nt-muted) !important;
+}
+
+/* ── List group items ─────────────────────────────────────────────────── */
+.list-group-item {
+  background-color: transparent;
+  color: var(--nt-text);
+  border-color: var(--nt-card-border);
+}
+
+/* ── Form controls ────────────────────────────────────────────────────── */
+.form-text {
+  color: rgba(180,200,230,0.75) !important;
+}
+
+.form-control, .form-select {
+  background-color: #111c2e;
+  border-color: var(--nt-card-border);
+  color: var(--nt-text);
+}
+.form-control:focus, .form-select:focus {
+  background-color: #111c2e;
+  border-color: var(--nt-blue);
+  color: var(--nt-text);
+  box-shadow: 0 0 0 .2rem rgba(13,110,253,.25);
+}
+.form-control::placeholder { color: var(--nt-muted); }
+
+/* ── Form select pro potraviny ────────────────────────────────────────── */
+.food-select {
+  max-width: 100%;
+}
+
+/* ── Animace alertů ───────────────────────────────────────────────────── */
+.alert {
+  animation: slideDown .25s ease-out;
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Tlačítko trash – méně rušivé ─────────────────────────────────────── */
+.btn-outline-danger {
+  --bs-btn-padding-x: .4rem;
+  --bs-btn-padding-y: .2rem;
+  font-size: .8rem;
+}
+
+/* ── text-muted override ──────────────────────────────────────────────── */
+.text-muted { color: var(--nt-muted) !important; }
+.small.text-muted { color: var(--nt-muted) !important; }
+
+/* ── Footer ───────────────────────────────────────────────────────────── */
+footer {
+  font-size: .8rem;
+  background: var(--nt-card);
+  border-top-color: var(--nt-card-border) !important;
+  color: var(--nt-muted);
+}
+
+/* ── Klikatelné nutrient řádky / karty ───────────────────────────────── */
+.nutrient-row {
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background .15s ease, box-shadow .15s ease;
+  padding: 6px 8px;
+}
+.nutrient-row:hover {
+  background-color: rgba(13,110,253,0.08);
+  box-shadow: 0 0 0 2px rgba(13,110,253,0.25);
+}
+.nutrient-row:active {
+  background-color: rgba(13,110,253,0.14);
+}
+
+/* ── Nutrient breakdown modal – dark theme ───────────────────────────── */
+#nutrientModal .modal-content {
+  background-color: #0f1824;
+  color: #e8edf3;
+  border: 1px solid rgba(255,255,255,.12);
+}
+#nutrientModal .modal-header {
+  border-bottom: 1px solid rgba(255,255,255,.1);
+}
+#nutrientModal .modal-footer {
+  border-top: 1px solid rgba(255,255,255,.1);
+}
+#nutrientModal .btn-close {
+  filter: invert(1) grayscale(1) brightness(1.5);
+}
+#nutrientModal .btn-secondary {
+  background-color: #1e2d42;
+  border-color: rgba(255,255,255,.15);
+  color: #c5d0de;
+}
+#nutrientModal .btn-secondary:hover {
+  background-color: #253547;
+}
+
+/* ── Accordion (Postup přípravy) – dark mode ─────────────────────────── */
+.accordion-item {
+  background-color: #1a2540;
+  border-color: var(--nt-card-border);
+  color: var(--nt-text);
+}
+.accordion-button {
+  background-color: #1a2540;
+  color: var(--nt-text);
+}
+.accordion-button:not(.collapsed) {
+  background-color: #1e2d45;
+  color: var(--nt-text);
+  box-shadow: none;
+}
+.accordion-button::after {
+  filter: invert(1) brightness(1.5);
+}
+.accordion-body {
+  background-color: #1a2540;
+  color: var(--nt-text);
+}
+
+/* ── Food autocomplete dropdown ──────────────────────────────────────── */
+.food-dropdown {
+  background-color: #111c2e;
+  border: 1px solid var(--nt-card-border);
+  border-radius: .4rem;
+  box-shadow: 0 6px 24px rgba(0,0,0,.6) !important;
+}
+.food-dropdown .list-group-item {
+  background-color: #111c2e !important;
+  color: var(--nt-text);
+  border-color: var(--nt-card-border);
+  font-size: .82rem;
+  padding: .4rem .75rem;
+  cursor: pointer;
+}
+.food-dropdown .list-group-item:hover,
+.food-dropdown .list-group-item:focus {
+  background-color: #1a2d4a !important;
+  color: #fff;
+}
+
+/* ── Tagy receptů ────────────────────────────────────────────────────── */
+/* Společné vlastnosti */
+.nt-tag-vegan, .nt-tag-gluten, .nt-tag-protein, .nt-tag-fiber,
+.nt-tag-omega, .nt-tag-antioxidant, .nt-tag-probiotic,
+.nt-tag-czech, .nt-tag-immune, .nt-tag-default {
+  font-size: .72rem;
+  font-weight: 500;
+  border-radius: 4px;
+  padding: .25em .55em;
+}
+/* Tmavý režim (výchozí) */
+.nt-tag-vegan       { background:rgba(25,135,84,.30);  color:#6eefb2; border:1px solid rgba(25,135,84,.5); }
+.nt-tag-gluten      { background:rgba(255,193,7,.22);  color:#ffe066; border:1px solid rgba(255,193,7,.45); }
+.nt-tag-protein     { background:rgba(13,110,253,.25); color:#7eb8ff; border:1px solid rgba(13,110,253,.45); }
+.nt-tag-fiber       { background:rgba(32,201,151,.22); color:#6ef0cc; border:1px solid rgba(32,201,151,.4); }
+.nt-tag-omega       { background:rgba(13,202,240,.22); color:#79eeff; border:1px solid rgba(13,202,240,.4); }
+.nt-tag-antioxidant { background:rgba(214,51,132,.22); color:#ff8ecb; border:1px solid rgba(214,51,132,.4); }
+.nt-tag-probiotic   { background:rgba(111,66,193,.25); color:#c9aaff; border:1px solid rgba(111,66,193,.45); }
+.nt-tag-czech       { background:rgba(220,53,69,.22);  color:#ff9aa6; border:1px solid rgba(220,53,69,.4); }
+.nt-tag-immune      { background:rgba(32,201,151,.22); color:#6ef0cc; border:1px solid rgba(32,201,151,.4); }
+.nt-tag-default     { background:rgba(108,117,125,.25);color:#ced4da; border:1px solid rgba(108,117,125,.45); }
+
+/* Světlý režim – tmavší text aby byl čitelný */
+html.light-mode .nt-tag-vegan       { background:rgba(25,135,84,.12);  color:#0a5c32; border-color:rgba(25,135,84,.4); }
+html.light-mode .nt-tag-gluten      { background:rgba(255,193,7,.20);  color:#7a5c00; border-color:rgba(200,150,0,.5); }
+html.light-mode .nt-tag-protein     { background:rgba(13,110,253,.12); color:#0a3d8f; border-color:rgba(13,110,253,.4); }
+html.light-mode .nt-tag-fiber       { background:rgba(32,201,151,.12); color:#0a6b50; border-color:rgba(32,201,151,.4); }
+html.light-mode .nt-tag-omega       { background:rgba(13,202,240,.12); color:#0a607a; border-color:rgba(13,202,240,.4); }
+html.light-mode .nt-tag-antioxidant { background:rgba(214,51,132,.12); color:#8a1f55; border-color:rgba(214,51,132,.4); }
+html.light-mode .nt-tag-probiotic   { background:rgba(111,66,193,.12); color:#4a1f8a; border-color:rgba(111,66,193,.4); }
+html.light-mode .nt-tag-czech       { background:rgba(220,53,69,.10);  color:#8b1a24; border-color:rgba(220,53,69,.4); }
+html.light-mode .nt-tag-immune      { background:rgba(32,201,151,.12); color:#0a6b50; border-color:rgba(32,201,151,.4); }
+html.light-mode .nt-tag-default     { background:rgba(108,117,125,.12);color:#3d444b; border-color:rgba(108,117,125,.4); }
+
+/* ── Mobilní responzivita ─────────────────────────────────────────────── */
+@media (max-width: 767.98px) {
+
+  /* Tabulky – povolíme zalamování textu v záhlavích */
+  .table th {
+    white-space: normal;
+    font-size: .75rem;
+  }
+
+  /* Součtové karty dashboardu – menší číslice */
+  .card .fs-4.fw-bold {
+    font-size: 1.1rem !important;
+  }
+
+  /* Date-picker input – nezabere celý řádek */
+  #date-input {
+    max-width: 145px;
+    min-width: 0;
+  }
+
+  /* Inline-editační formuláře v meal slotech – zalamovat na 2 řádky */
+  .nt-edit-form {
+    flex-wrap: wrap;
+  }
+
+  /* Zkrátit e-mail uživatele v dropdown tlačítku navbaru */
+  .navbar .nav-link.dropdown-toggle {
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+    vertical-align: middle;
+  }
+
+  /* Hlavička meal-slotu – tlačítko Přidat se nevykresluje přes text */
+  .meal-slot-header {
+    padding-right: 5.5rem !important;
+  }
+}
+
+@media (max-width: 575.98px) {
+
+  /* Méně odsazení hlavního obsahu */
+  main.container {
+    padding-left: .6rem;
+    padding-right: .6rem;
+  }
+
+  /* Ještě menší čísla v součtových kartách */
+  .card .fs-4.fw-bold {
+    font-size: .95rem !important;
+  }
+
+  /* Mikronutrient / minerální karty – menší popisný text */
+  .card-body .small.text-muted {
+    font-size: .7rem;
+  }
+
+  /* Tlačítka v hlavičkách karet – trochu menší */
+  .card-header .btn-sm {
+    padding: .18rem .4rem;
+    font-size: .78rem;
+  }
+
+  /* Graf – zajistit, aby se nevytahoval přes okno */
+  canvas {
+    max-width: 100% !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   THEME TOGGLE BUTTON
+   ══════════════════════════════════════════════════════════════════════ */
+.nt-theme-btn {
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #ffffff;
+  transition: background .2s;
+  flex-shrink: 0;
+  cursor: pointer;
+  line-height: 1;
+}
+.nt-theme-btn:hover {
+  background: rgba(255,255,255,0.28);
+  color: #ffffff;
+}
+.nt-theme-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(255,255,255,.4);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   LIGHT MODE  (html.light-mode)
+   ══════════════════════════════════════════════════════════════════════ */
+html.light-mode {
+  --nt-bg:          #f0f4f8;
+  --nt-card:        #ffffff;
+  --nt-card-border: #d0d7de;
+  --nt-text:        #1a202c;
+  --nt-muted:       #637085;
+}
+
+html.light-mode body {
+  background-color: var(--nt-bg);
+  color: var(--nt-text);
+}
+
+/* Navbar – zachovat tmavé pozadí (text zůstane bílý díky navbar-dark) */
+html.light-mode .navbar.bg-primary {
+  background: linear-gradient(90deg, #1e3a8a 0%, #1d4ed8 100%) !important;
+}
+
+/* Cards */
+html.light-mode .card-header.bg-light {
+  background-color: rgba(0,0,0,0.03) !important;
+}
+
+/* Progress bar track */
+html.light-mode .nt-progress {
+  background-color: rgba(0,0,0,0.1);
+}
+
+/* Table */
+html.light-mode .table {
+  --bs-table-color:        var(--nt-text);
+  --bs-table-striped-bg:   rgba(13,110,253,0.04);
+  --bs-table-hover-bg:     rgba(13,110,253,0.07);
+  --bs-table-border-color: var(--nt-card-border);
+}
+html.light-mode .table-light,
+html.light-mode .table thead.table-light th {
+  background-color: rgba(0,0,0,0.04) !important;
+  color: var(--nt-muted) !important;
+}
+
+/* Form controls */
+html.light-mode .form-control,
+html.light-mode .form-select {
+  background-color: #ffffff;
+  border-color: #ced4da;
+  color: #1a202c;
+}
+html.light-mode .form-control:focus,
+html.light-mode .form-select:focus {
+  background-color: #ffffff;
+  color: #1a202c;
+}
+html.light-mode .form-control::placeholder {
+  color: #9faab7;
+}
+
+/* Food autocomplete dropdown */
+html.light-mode .food-dropdown {
+  background-color: #ffffff;
+  border-color: #ced4da;
+  box-shadow: 0 6px 24px rgba(0,0,0,.15) !important;
+}
+html.light-mode .food-dropdown .list-group-item {
+  background-color: #ffffff !important;
+  color: #1a202c;
+  border-color: #e9ecef;
+}
+html.light-mode .food-dropdown .list-group-item:hover,
+html.light-mode .food-dropdown .list-group-item:focus {
+  background-color: #e8f0fe !important;
+  color: #1a202c;
+}
+
+/* Accordion – light mode reset */
+html.light-mode .accordion-item {
+  background-color: #ffffff;
+  border-color: #dee2e6;
+  color: #1a202c;
+}
+html.light-mode .accordion-button {
+  background-color: #f8f9fa;
+  color: #1a202c;
+}
+html.light-mode .accordion-button:not(.collapsed) {
+  background-color: #e8f0fe;
+  color: #1a202c;
+}
+html.light-mode .accordion-button::after {
+  filter: none;
+}
+html.light-mode .accordion-body {
+  background-color: #ffffff;
+  color: #1a202c;
+}
+
+/* Footer */
+html.light-mode footer {
+  background: #ffffff;
+  border-top-color: var(--nt-card-border) !important;
+}
+
+/* Nutrient modal */
+html.light-mode #nutrientModal .modal-content {
+  background-color: #ffffff;
+  color: #1a202c;
+  border: 1px solid #ced4da;
+}
+html.light-mode #nutrientModal .modal-header {
+  border-bottom: 1px solid #dee2e6;
+}
+html.light-mode #nutrientModal .modal-footer {
+  border-top: 1px solid #dee2e6;
+}
+html.light-mode #nutrientModal .btn-close {
+  filter: none;
+}
+html.light-mode #nutrientModal .btn-secondary {
+  background-color: #e9ecef;
+  border-color: #ced4da;
+  color: #212529;
+}
+html.light-mode #nutrientModal .btn-secondary:hover {
+  background-color: #d3d9df;
+}
+
+/* Bootstrap dropdown menu */
+html.light-mode .dropdown-menu {
+  background-color: #ffffff;
+  border-color: #ced4da;
+}
+html.light-mode .dropdown-item {
+  color: #1a202c;
+}
+html.light-mode .dropdown-item:hover {
+  background-color: #f0f4f8;
+  color: #1a202c;
+}
+html.light-mode .dropdown-divider {
+  border-color: #dee2e6;
+}
+html.light-mode .dropdown-item-text {
+  color: #637085;
+}

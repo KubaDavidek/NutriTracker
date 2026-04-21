@@ -1,0 +1,978 @@
+{% extends "base.html" %}
+{% block title %}Denní přehled – {{ day }}{% endblock %}
+
+{% block content %}
+
+{% if pending_invitations %}
+<div class="alert alert-warning alert-dismissible fade show mb-3" role="alert">
+  <i class="bi bi-person-check-fill me-2"></i>
+  <strong>Máte čekající pozvánky od poradců</strong>
+  {% for inv in pending_invitations %}
+  <div class="mt-2 d-flex align-items-center gap-2 flex-wrap">
+    <span><i class="bi bi-person-circle me-1"></i>{{ inv.advisor_email }}</span>
+    <form method="POST" action="{{ url_for('dashboard.accept_invitation') }}" class="d-inline">
+      <input type="hidden" name="advisor_id" value="{{ inv.advisor_id }}">
+      <button type="submit" class="btn btn-sm btn-success">
+        <i class="bi bi-check-lg"></i> Přijmout
+      </button>
+    </form>
+    <form method="POST" action="{{ url_for('dashboard.reject_invitation') }}" class="d-inline">
+      <input type="hidden" name="advisor_id" value="{{ inv.advisor_id }}">
+      <button type="submit" class="btn btn-sm btn-outline-danger">
+        <i class="bi bi-x-lg"></i> Odmítnout
+      </button>
+    </form>
+  </div>
+  {% endfor %}
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h3 class="mb-0"><i class="bi bi-calendar-day text-primary"></i> Denní přehled</h3>
+
+  <!-- Výběr data -->
+  <div class="d-flex align-items-center gap-1">
+    <button class="btn btn-sm btn-primary" id="btn-prev-day" title="Předchozí den">
+      <i class="bi bi-arrow-left"></i>
+    </button>
+    <form method="GET" action="{{ url_for('dashboard.index') }}" id="date-form" class="d-flex">
+      <input type="date" class="form-control form-control-sm" name="date" id="date-input"
+             value="{{ day }}" min="{{ min_iso }}" max="{{ today_iso }}"
+             onchange="this.form.submit()"/>
+    </form>
+    <button class="btn btn-sm btn-primary" id="btn-next-day" title="Následující den">
+      <i class="bi bi-arrow-right"></i>
+    </button>
+  </div>
+  <script>
+  (function(){
+    var input  = document.getElementById('date-input');
+    var form   = document.getElementById('date-form');
+    var today  = '{{ today_iso }}';
+    var minDay = '{{ min_iso }}';
+    function shiftDay(delta){
+      var d = new Date(input.value + 'T00:00:00');
+      d.setDate(d.getDate() + delta);
+      var yyyy = d.getFullYear();
+      var mm   = String(d.getMonth()+1).padStart(2,'0');
+      var dd   = String(d.getDate()).padStart(2,'0');
+      var next = yyyy+'-'+mm+'-'+dd;
+      if(delta > 0 && next > today) return;
+      if(delta < 0 && next < minDay) return;
+      input.value = next;
+      form.submit();
+    }
+    document.getElementById('btn-prev-day').addEventListener('click', function(){ shiftDay(-1); });
+    document.getElementById('btn-next-day').addEventListener('click', function(){ shiftDay(+1); });
+  })();
+  </script>
+</div>
+
+<!-- ── Denní součty ──────────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-2">
+    <div class="card text-center border-primary">
+      <div class="card-body py-2">
+        <div class="fs-4 fw-bold text-primary">{{ totals.kcal }}</div>
+        <div class="small text-muted">kcal příjem</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card text-center">
+      <div class="card-body py-2">
+        <div class="fs-4 fw-bold">{{ totals.protein }}<span class="fs-6 text-muted"> g</span></div>
+        <div class="small text-muted">Bílkoviny</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card text-center">
+      <div class="card-body py-2">
+        <div class="fs-4 fw-bold">{{ totals.carbs }}<span class="fs-6 text-muted"> g</span></div>
+        <div class="small text-muted">Sacharidy</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card text-center">
+      <div class="card-body py-2">
+        <div class="fs-4 fw-bold">{{ totals.fat }}<span class="fs-6 text-muted"> g</span></div>
+        <div class="small text-muted">Tuky</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card text-center border-warning">
+      <div class="card-body py-2">
+        <div class="fs-4 fw-bold text-warning">{{ totals.calories_burned }}</div>
+        <div class="small text-muted">kcal výdej</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card text-center {% if totals.balance > 0 %}border-danger{% else %}border-primary{% endif %}">
+      <div class="card-body py-2">
+        <div class="fs-4 fw-bold {% if totals.balance > 0 %}text-danger{% else %}text-primary{% endif %}">
+          {{ totals.balance }}
+        </div>
+        <div class="small text-muted">Bilance</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Grafy ─────────────────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+
+  <!-- Plnění cílů – progress bary -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold text-center">
+        <i class="bi bi-bar-chart-steps text-primary"></i> Plnění cílů dnes
+      </div>
+      <div class="card-body d-flex flex-column justify-content-center gap-3 py-3">
+
+        <!-- Kalorie -->
+        {% set kcal_over = totals.kcal > targets.kcal * 1.2 %}
+        <div class="nutrient-row" role="button"
+             data-bs-toggle="modal" data-bs-target="#nutrientModal"
+             data-nutrient="kcal" data-label="Kalorie" data-unit="kcal"
+             title="Klikni pro rozpis">
+          <div class="d-flex justify-content-between small fw-semibold mb-1">
+            <span><i class="bi bi-lightning-charge {% if kcal_over %}text-danger{% else %}text-primary{% endif %}"></i> Kalorie
+              <i class="bi bi-info-circle text-muted ms-1" style="font-size:.65rem"></i></span>
+            <span class="{% if kcal_over %}text-danger{% else %}text-primary{% endif %}">
+              {{ totals.kcal }} <span class="text-muted fw-normal">/ {{ targets.kcal }} kcal</span>
+              {% if kcal_over %}<i class="bi bi-exclamation-triangle-fill ms-1"></i>{% endif %}
+            </span>
+          </div>
+          <div class="progress nt-progress">
+            <div class="progress-bar nt-animated {% if kcal_over %}bg-danger{% else %}bg-primary{% endif %}"
+                 style="width: min({{ (totals.kcal / targets.kcal * 100) | round(1) }}%, 100%)">
+            </div>
+          </div>
+        </div>
+
+        <!-- Bílkoviny -->
+        {% set prot_over = totals.protein > targets.protein * 1.2 %}
+        <div class="nutrient-row" role="button"
+             data-bs-toggle="modal" data-bs-target="#nutrientModal"
+             data-nutrient="protein" data-label="Bílkoviny" data-unit="g"
+             title="Klikni pro rozpis">
+          <div class="d-flex justify-content-between small fw-semibold mb-1">
+            <span><i class="bi bi-egg {% if prot_over %}text-danger{% else %}text-primary{% endif %}"></i> Bílkoviny
+              <i class="bi bi-info-circle text-muted ms-1" style="font-size:.65rem"></i></span>
+            <span class="{% if prot_over %}text-danger{% else %}text-primary{% endif %}">
+              {{ totals.protein }} g <span class="text-muted fw-normal">/ {{ targets.protein }} g</span>
+              {% if prot_over %}<i class="bi bi-exclamation-triangle-fill ms-1"></i>{% endif %}
+            </span>
+          </div>
+          <div class="progress nt-progress">
+            <div class="progress-bar nt-animated {% if prot_over %}bg-danger{% else %}bg-primary{% endif %}"
+                 style="width: min({{ (totals.protein / targets.protein * 100) | round(1) }}%, 100%)">
+            </div>
+          </div>
+        </div>
+
+        <!-- Sacharidy -->
+        {% set carbs_over = totals.carbs > targets.carbs * 1.2 %}
+        <div class="nutrient-row" role="button"
+             data-bs-toggle="modal" data-bs-target="#nutrientModal"
+             data-nutrient="carbs" data-label="Sacharidy" data-unit="g"
+             title="Klikni pro rozpis">
+          <div class="d-flex justify-content-between small fw-semibold mb-1">
+            <span><i class="bi bi-stack {% if carbs_over %}text-danger{% else %}text-primary{% endif %}"></i> Sacharidy
+              <i class="bi bi-info-circle text-muted ms-1" style="font-size:.65rem"></i></span>
+            <span class="{% if carbs_over %}text-danger{% else %}text-primary{% endif %}">
+              {{ totals.carbs }} g <span class="text-muted fw-normal">/ {{ targets.carbs }} g</span>
+              {% if carbs_over %}<i class="bi bi-exclamation-triangle-fill ms-1"></i>{% endif %}
+            </span>
+          </div>
+          <div class="progress nt-progress">
+            <div class="progress-bar nt-animated {% if carbs_over %}bg-danger{% else %}bg-primary{% endif %}"
+                 style="width: min({{ (totals.carbs / targets.carbs * 100) | round(1) }}%, 100%)">
+            </div>
+          </div>
+        </div>
+
+        <!-- Tuky -->
+        {% set fat_over = totals.fat > targets.fat * 1.2 %}
+        <div class="nutrient-row" role="button"
+             data-bs-toggle="modal" data-bs-target="#nutrientModal"
+             data-nutrient="fat" data-label="Tuky" data-unit="g"
+             title="Klikni pro rozpis">
+          <div class="d-flex justify-content-between small fw-semibold mb-1">
+            <span><i class="bi bi-droplet {% if fat_over %}text-danger{% else %}text-primary{% endif %}"></i> Tuky
+              <i class="bi bi-info-circle text-muted ms-1" style="font-size:.65rem"></i></span>
+            <span class="{% if fat_over %}text-danger{% else %}text-primary{% endif %}">
+              {{ totals.fat }} g <span class="text-muted fw-normal">/ {{ targets.fat }} g</span>
+              {% if fat_over %}<i class="bi bi-exclamation-triangle-fill ms-1"></i>{% endif %}
+            </span>
+          </div>
+          <div class="progress nt-progress">
+            <div class="progress-bar nt-animated {% if fat_over %}bg-danger{% else %}bg-primary{% endif %}"
+                 style="width: min({{ (totals.fat / targets.fat * 100) | round(1) }}%, 100%)">
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Bilance dnes -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold text-center">
+        <i class="bi bi-bar-chart text-primary"></i> Bilance dnes
+      </div>
+      <div class="card-body d-flex justify-content-center align-items-center">
+        <canvas id="balanceChart" style="max-height:200px;"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Kalorie 7 dní -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold text-center">
+        <i class="bi bi-graph-up text-primary"></i> Kalorie – 7 dní
+      </div>
+      <div class="card-body">
+        <canvas id="historyChart" style="max-height:200px;"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Jídla podle slotů ─────────────────────────────────────────────────── -->
+{% for slot_key, slot_label, slot_color in meal_slots %}
+<div class="card mb-3 border-0 border-start border-4 border-{{ slot_color }}" style="border-radius:8px">
+  <div class="card-header bg-{{ slot_color }} bg-opacity-25 position-relative d-flex align-items-center justify-content-center meal-slot-header"
+       style="border-radius:0 8px 0 0; min-height:2.6rem">
+    <span class="fw-semibold">
+      <i class="bi bi-bowl-hot text-{{ slot_color }}"></i> {{ slot_label }}
+    </span>
+    <!-- Přidat potravinu → toggle formuláře -->
+    <button class="btn btn-sm btn-outline-{{ slot_color }} position-absolute end-0 me-2"
+            data-bs-toggle="collapse"
+            data-bs-target="#addForm_{{ slot_key }}">
+      <i class="bi bi-plus-circle"></i> Přidat
+    </button>
+  </div>
+
+  <!-- Formulář pro přidání položky -->
+  <div class="collapse" id="addForm_{{ slot_key }}">
+    <div class="card-body border-bottom" style="background: rgba(13,110,253,0.07);">
+      <form method="POST" action="{{ url_for('dashboard.add_meal') }}"
+            class="row g-2 align-items-end">
+        <input type="hidden" name="date" value="{{ day }}"/>
+        <input type="hidden" name="meal_slot" value="{{ slot_key }}"/>
+        <div class="col-md-5">
+          <label class="form-label small mb-1">Potravina</label>
+          <div class="position-relative food-search-wrap">
+            <input type="text"
+                   class="form-control form-control-sm food-search-input"
+                   placeholder="Začni psát název…"
+                   autocomplete="off"/>
+            <input type="hidden" name="food_id"          class="food-id-input"/>
+            <input type="hidden" name="food_name"        class="food-name-input"/>
+            <input type="hidden" name="food_kcal"        class="food-kcal-input"/>
+            <input type="hidden" name="food_protein"     class="food-protein-input"/>
+            <input type="hidden" name="food_carbs"       class="food-carbs-input"/>
+            <input type="hidden" name="food_fat"         class="food-fat-input"/>
+            <input type="hidden" name="food_fiber"       class="food-fiber-input"/>
+            <input type="hidden" name="food_sugars"      class="food-sugars-input"/>
+            <input type="hidden" name="food_sat_fat"     class="food-sat_fat-input"/>
+            <input type="hidden" name="food_vitamin_c"   class="food-vitamin_c-input"/>
+            <input type="hidden" name="food_vitamin_b12" class="food-vitamin_b12-input"/>
+            <input type="hidden" name="food_sodium"      class="food-sodium-input"/>
+            <input type="hidden" name="food_calcium"     class="food-calcium-input"/>
+            <input type="hidden" name="food_iron"        class="food-iron-input"/>
+            <input type="hidden" name="food_potassium"   class="food-potassium-input"/>
+            <input type="hidden" name="food_magnesium"   class="food-magnesium-input"/>
+            <input type="hidden" name="food_phosphorus"  class="food-phosphorus-input"/>
+            <div class="food-dropdown list-group position-absolute w-100 shadow"
+                 style="z-index:1050; display:none; max-height:200px; overflow-y:auto;"></div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small mb-1">Gramy (g)</label>
+          <input type="number" class="form-control form-control-sm"
+                 name="grams" min="1" max="5000" step="1"
+                 placeholder="100" required/>
+        </div>
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-primary btn-sm w-100">
+            <i class="bi bi-check-lg"></i> Přidat
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Seznam položek -->
+  <ul class="list-group list-group-flush">
+    {% set slot_items = log.meals[slot_key] %}
+    {% if slot_items %}
+      {% for item in slot_items %}
+      <li class="list-group-item p-0">
+        <!-- Hlavní řádek -->
+        <div class="d-flex justify-content-between align-items-center px-3 py-2">
+          <span>
+            <strong>{{ item.name }}</strong>
+            <span class="text-muted small ms-2" id="grams-label-{{ item.entry_id }}">{{ item.grams }} g</span>
+          </span>
+          <span class="d-flex align-items-center gap-3">
+            <span class="badge bg-primary">
+              {{ (item.kcal * item.grams / 100) | round(1) }} kcal
+            </span>
+            <span class="text-muted small d-none d-md-inline">
+              B: {{ (item.protein * item.grams / 100) | round(1) }}g |
+              S: {{ (item.carbs   * item.grams / 100) | round(1) }}g |
+              T: {{ (item.fat     * item.grams / 100) | round(1) }}g
+            </span>
+            <!-- Tlačítko upravit -->
+            <button class="btn btn-sm btn-outline-primary"
+                    title="Upravit gramy"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#editRow_{{ item.entry_id }}">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <!-- Tlačítko smazat -->
+            <form method="POST" action="{{ url_for('dashboard.remove_meal') }}" class="m-0">
+              <input type="hidden" name="date"      value="{{ day }}"/>
+              <input type="hidden" name="meal_slot"  value="{{ slot_key }}"/>
+              <input type="hidden" name="entry_id"   value="{{ item.entry_id }}"/>
+              <button type="submit" class="btn btn-sm btn-outline-danger"
+                      title="Odebrat"
+                      onclick="return confirm('Odebrat položku?')">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </form>
+          </span>
+        </div>
+        <!-- Inline edit formulář -->
+        <div class="collapse" id="editRow_{{ item.entry_id }}">
+          <div class="px-3 py-2 border-top" style="background: rgba(13,110,253,0.07);">
+            <form method="POST" action="{{ url_for('dashboard.edit_meal') }}"
+                  class="d-flex align-items-center gap-2 nt-edit-form">
+              <input type="hidden" name="date"      value="{{ day }}"/>
+              <input type="hidden" name="meal_slot"  value="{{ slot_key }}"/>
+              <input type="hidden" name="entry_id"   value="{{ item.entry_id }}"/>
+              <label class="small text-muted mb-0 me-1 flex-shrink-0">Nové gramy:</label>
+              <input type="number" class="form-control form-control-sm"
+                     style="flex:1;min-width:70px;max-width:120px;"
+                     name="grams" min="1" max="5000" step="1"
+                     value="{{ item.grams }}" required/>
+              <button type="submit" class="btn btn-primary btn-sm flex-shrink-0">
+                <i class="bi bi-check-lg"></i> Uložit
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm flex-shrink-0"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#editRow_{{ item.entry_id }}">
+                Zrušit
+              </button>
+            </form>
+          </div>
+        </div>
+      </li>
+      {% endfor %}
+    {% else %}
+      <li class="list-group-item text-muted small fst-italic">
+        Žádné položky – přidej první jídlo.
+      </li>
+    {% endif %}
+  </ul>
+</div>
+{% endfor %}
+
+<!-- ── Aktivity ───────────────────────────────────────────────────────────── -->
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center bg-light">
+    <span class="fw-semibold">
+      <i class="bi bi-lightning-charge text-warning"></i> Aktivity & výdej
+    </span>
+    <button class="btn btn-sm btn-outline-warning"
+            data-bs-toggle="collapse" data-bs-target="#addActivityForm">
+      <i class="bi bi-plus-circle"></i> Přidat
+    </button>
+  </div>
+
+  <div class="collapse" id="addActivityForm">
+    <div class="card-body border-bottom bg-warning bg-opacity-10">
+      <form method="POST" action="{{ url_for('dashboard.add_activity') }}"
+            class="row g-2 align-items-end">
+        <input type="hidden" name="date" value="{{ day }}"/>
+
+        <!-- Typ aktivity (dropdown) -->
+        <div class="col-md-4">
+          <label class="form-label small mb-1">Typ aktivity</label>
+          <select class="form-select form-select-sm" id="activitySelect" name="activity_name"
+                  onchange="activityChanged()" required>
+            <option value="" disabled selected>— vyber aktivitu —</option>
+            <optgroup label="Kardio">
+              <option value="Běh (pomalý)"          data-kcal="8">Běh (pomalý ~8 km/h)</option>
+              <option value="Běh (střední)"          data-kcal="11">Běh (střední ~10 km/h)</option>
+              <option value="Běh (rychlý)"           data-kcal="14">Běh (rychlý ~13 km/h)</option>
+              <option value="Rychlá chůze"           data-kcal="5">Rychlá chůze</option>
+              <option value="Cyklistika (lehká)"     data-kcal="6">Cyklistika (lehká)</option>
+              <option value="Cyklistika (střední)"   data-kcal="9">Cyklistika (střední)</option>
+              <option value="Cyklistika (intenzivní)" data-kcal="12">Cyklistika (intenzivní)</option>
+              <option value="Plavání"                data-kcal="9">Plavání</option>
+              <option value="Veslování"              data-kcal="9">Veslování (ergometr)</option>
+              <option value="Skákání přes švihadlo"  data-kcal="11">Skákání přes švihadlo</option>
+              <option value="Eliptický trenažér"     data-kcal="8">Eliptický trenažér</option>
+              <option value="HIIT"                   data-kcal="13">HIIT trénink</option>
+            </optgroup>
+            <optgroup label="Silový trénink">
+              <option value="Posilovna"              data-kcal="6">Posilovna (obecně)</option>
+              <option value="Kruhový trénink"        data-kcal="9">Kruhový trénink</option>
+              <option value="Crossfit"               data-kcal="12">Crossfit</option>
+            </optgroup>
+            <optgroup label="Sporty">
+              <option value="Fotbal"                 data-kcal="9">Fotbal</option>
+              <option value="Basketbal"              data-kcal="8">Basketbal</option>
+              <option value="Tenis"                  data-kcal="8">Tenis</option>
+              <option value="Volejbal"               data-kcal="5">Volejbal</option>
+              <option value="Hokej"                  data-kcal="10">Hokej</option>
+              <option value="Squash"                 data-kcal="12">Squash</option>
+              <option value="Box / MMA"              data-kcal="11">Box / MMA</option>
+            </optgroup>
+            <optgroup label="Ostatní">
+              <option value="Jóga"                   data-kcal="3">Jóga</option>
+              <option value="Pilates"                data-kcal="4">Pilates</option>
+              <option value="Tanec"                  data-kcal="5">Tanec</option>
+              <option value="Turistika"              data-kcal="6">Turistika</option>
+              <option value="Vlastní"                data-kcal="0">Vlastní…</option>
+            </optgroup>
+          </select>
+          <!-- Vlastní název (zobrazí se jen pro "Vlastní") -->
+          <input type="text" id="customActivityName" class="form-control form-control-sm mt-1"
+                 placeholder="Název aktivity" style="display:none;"
+                 oninput="syncCustomName()"/>
+        </div>
+
+        <!-- Trvání -->
+        <div class="col-md-2">
+          <label class="form-label small mb-1">Trvání (min)</label>
+          <input type="number" class="form-control form-control-sm" id="activityMinutes"
+                 name="duration_min" min="1" max="600" placeholder="30"
+                 oninput="calcKcal()"/>
+        </div>
+
+        <!-- Spálené kcal -->
+        <div class="col-md-2">
+          <label class="form-label small mb-1">Spálené kcal</label>
+          <input type="number" class="form-control form-control-sm"
+                 name="calories_burned" id="activityKcal"
+                 min="0" step="1" placeholder="–" required/>
+        </div>
+
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-warning btn-sm w-100">
+            <i class="bi bi-check-lg"></i> Přidat
+          </button>
+        </div>
+      </form>
+
+      <div class="text-muted mt-2" style="font-size:.73rem;">
+        <i class="bi bi-info-circle me-1"></i>
+        Kcal se dopočítají automaticky dle průměrné osoby 70 kg. Hodnotu lze upravit ručně.
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    window.activityChanged = function(){
+      var sel   = document.getElementById('activitySelect');
+      var opt   = sel.options[sel.selectedIndex];
+      var kcalPM = parseInt(opt.getAttribute('data-kcal') || '0', 10);
+      var custom = document.getElementById('customActivityName');
+      if (opt.value === 'Vlastní') {
+        custom.style.display = '';
+        custom.required = true;
+        sel.name = '_activity_select_ignored';
+        custom.name = 'activity_name';
+      } else {
+        custom.style.display = 'none';
+        custom.required = false;
+        sel.name = 'activity_name';
+        custom.name = '_ignored';
+      }
+      window._kcalPerMin = kcalPM;
+      calcKcal();
+    };
+    window.syncCustomName = function(){};
+    window.calcKcal = function(){
+      var mins  = parseInt(document.getElementById('activityMinutes').value, 10);
+      var kcalF = document.getElementById('activityKcal');
+      if (!isNaN(mins) && mins > 0 && window._kcalPerMin > 0) {
+        kcalF.value = Math.round(window._kcalPerMin * mins);
+      }
+    };
+    window._kcalPerMin = 0;
+  })();
+  </script>
+
+  <ul class="list-group list-group-flush">
+    {% if log.activities %}
+      {% for act in log.activities %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <span>
+          <i class="bi bi-activity text-warning"></i>
+          <strong>{{ act.name }}</strong>
+        </span>
+        <span class="d-flex align-items-center gap-3">
+          <span class="badge bg-warning text-dark">
+            −{{ act.calories_burned }} kcal
+          </span>
+          <form method="POST" action="{{ url_for('dashboard.remove_activity') }}" class="m-0">
+            <input type="hidden" name="date"        value="{{ day }}"/>
+            <input type="hidden" name="activity_id" value="{{ act.activity_id }}"/>
+            <button type="submit" class="btn btn-sm btn-outline-danger"
+                    title="Odebrat"
+                    onclick="return confirm('Odebrat aktivitu?')">
+              <i class="bi bi-trash3"></i>
+            </button>
+          </form>
+        </span>
+      </li>
+      {% endfor %}
+    {% else %}
+      <li class="list-group-item text-muted small fst-italic">
+        Žádné aktivity pro tento den.
+      </li>
+    {% endif %}
+  </ul>
+</div>
+
+<!-- ── Voda ───────────────────────────────────────────────────────────── -->
+<div class="card border-info mb-3">
+  <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-droplet-half text-info"></i> Pitný režim</span>
+    <span class="small text-muted fw-normal">{{ water_total }} / {{ water_goal }} ml</span>
+  </div>
+  <div class="card-body">
+    {% set water_pct_raw = (water_total / water_goal * 100)|int if water_goal > 0 else 0 %}
+    {% set water_pct = water_pct_raw if water_pct_raw <= 100 else 100 %}
+    <div class="progress mb-3" style="height:14px;">
+      <div class="progress-bar {{ 'bg-success' if water_pct >= 100 else 'bg-info' }}"
+           role="progressbar"
+           style="width:{{ water_pct }}%"
+           aria-valuenow="{{ water_total }}" aria-valuemin="0" aria-valuemax="{{ water_goal }}">
+        {% if water_pct >= 10 %}{{ water_pct }}%{% endif %}
+      </div>
+    </div>
+
+    <!-- Přidat vodu -->
+    <form method="POST" action="{{ url_for('dashboard.add_water') }}" class="row g-2 align-items-end mb-3">
+      <input type="hidden" name="date" value="{{ day }}"/>
+      <div class="col-auto">
+        <label class="form-label small mb-1">Přidat (ml)</label>
+        <input type="number" name="ml" class="form-control form-control-sm" style="width:110px;"
+               min="1" max="5000" step="1" placeholder="napr. 250" required/>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-info">
+          <i class="bi bi-plus-lg"></i> Přidat
+        </button>
+      </div>
+      <!-- Rychlé tlačítka -->
+      <div class="col-12 d-flex flex-wrap gap-1 mt-1">
+        {% for quick_ml in [150, 200, 250, 330, 500] %}
+        <button type="button" class="btn btn-outline-info btn-sm py-0 px-2"
+                onclick="this.closest('form').querySelector('[name=ml]').value={{ quick_ml }}">
+          {{ quick_ml }} ml
+        </button>
+        {% endfor %}
+      </div>
+    </form>
+
+    <!-- Seznam záznamů -->
+    {% if water_entries %}
+    <ul class="list-group list-group-flush">
+      {% for w in water_entries %}
+      <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-1"
+          style="background:transparent;">
+        <span><i class="bi bi-droplet text-info me-1"></i>{{ w.ml }} ml</span>
+        <form method="POST" action="{{ url_for('dashboard.remove_water') }}" class="m-0">
+          <input type="hidden" name="date"     value="{{ day }}"/>
+          <input type="hidden" name="water_id" value="{{ w.id }}"/>
+          <button type="submit" class="btn btn-sm btn-link text-danger p-0"
+                  onclick="return confirm('Odebrat záznam?')" title="Odebrat">
+            <i class="bi bi-x-circle"></i>
+          </button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted small fst-italic mb-0">Zatím žádný záznam pro tento den.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Premium ─────────────────────────────────────────────────────────── -->
+{% if not session.is_premium %}
+<div class="card border-warning mb-3">
+  <div class="card-body text-center py-4">
+    <i class="bi bi-star-fill text-warning fs-3"></i>
+    <h5 class="mt-2">Premium funkce</h5>
+    <p class="text-muted mb-2">
+      Recepty, mikroživiny, minerály a pokročilé statistiky jsou dostupné
+      v Premium verzi.
+    </p>
+    <a href="{{ url_for('premium.index') }}" class="btn btn-warning">
+      <i class="bi bi-unlock-fill"></i> Aktivovat Premium
+    </a>
+  </div>
+</div>
+
+{% else %}
+<!-- ══ PREMIUM AKTIVNÍ ════════════════════════════════════════════════════ -->
+
+<!-- Mikroživiny -->
+<div class="card border-0 border-start border-4 border-success mb-3" style="border-radius:8px">
+  <div class="card-header bg-success bg-opacity-25 fw-semibold position-relative d-flex align-items-center justify-content-center"
+       style="border-radius:0 8px 0 0; min-height:2.6rem">
+    <span><i class="bi bi-capsule text-success me-1"></i> Mikroživiny dnes</span>
+    <span class="badge bg-warning text-dark position-absolute end-0 me-2">
+      <i class="bi bi-star-fill"></i> Premium
+    </span>
+  </div>
+  <div class="card-body pb-2">
+    <p class="text-muted small mb-3">
+      <i class="bi bi-info-circle me-1"></i>
+      Reálná data z USDA FoodData Central – DDD = doporučená denní dávka pro dospělého.
+    </p>
+    <div class="row g-2">
+      {% set micro_items = [
+        ("Cukry",        micros.get("sugars",     0)|round(1), 50,  "g",  "bg-danger",   "bi-droplet-fill text-danger",          "sugars"),
+        ("Vláknina",     micros.get("fiber",      0)|round(1), 28,  "g",  "bg-success",  "bi-tree-fill text-success",            "fiber"),
+        ("Vitamín C",    micros.get("vitamin_c",  0)|round(1), 90,  "mg", "bg-warning",  "bi-sun-fill text-warning",             "vitamin_c"),
+        ("Vitamín B12",  micros.get("vitamin_b12",0)|round(2), 2.4, "µg", "bg-info",     "bi-stars text-info",                   "vitamin_b12"),
+        ("Nasyc. tuky",  micros.get("sat_fat",    0)|round(1), 20,  "g",  "bg-secondary","bi-exclamation-circle text-secondary", "sat_fat"),
+      ] %}
+      {% for label, val, dv, unit, bar_cls, icon_cls, nkey in micro_items %}
+      <div class="col-6 col-md-4 col-lg-2">
+        <div class="card h-100 border-0 shadow-sm nutrient-row"
+             role="button" title="Klikni pro rozpis"
+             data-bs-toggle="modal" data-bs-target="#nutrientModal"
+             data-nutrient="{{ nkey }}" data-label="{{ label }}" data-unit="{{ unit }}">
+          <div class="card-body p-2">
+            <div class="small fw-semibold mb-1">
+              <i class="bi {{ icon_cls }} me-1"></i>{{ label }}
+            </div>
+            <div class="fs-6 fw-bold">{{ val }}<span class="text-muted fw-normal small ms-1">{{ unit }}</span></div>
+            <div class="progress mt-1 mb-1" style="height:5px;">
+              {% set pct = [(val / dv * 100) | round(0) | int, 100] | min %}
+              <div class="progress-bar {{ bar_cls }}" style="width:{{ pct }}%"></div>
+            </div>
+            <div class="text-muted" style="font-size:.7rem;">{{ pct }} % / {{ dv }} {{ unit }}</div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Minerály -->
+<div class="card border-0 border-start border-4 border-primary mb-3" style="border-radius:8px">
+  <div class="card-header bg-primary bg-opacity-25 fw-semibold text-center"
+       style="border-radius:0 8px 0 0">
+    <i class="bi bi-gem text-primary me-1"></i> Minerály &amp; elektrolyty dnes
+  </div>
+  <div class="card-body pb-2">
+    <div class="row g-2">
+      {% set mineral_items = [
+        ("Sodík (Na)",   micros.get("sodium",    0)|int,     2300, "mg", "bg-info",     "bi-dash-circle-fill text-info",          "Krevní tlak, hydratace",         "sodium"),
+        ("Vápník (Ca)",  micros.get("calcium",   0)|int,     1300, "mg", "bg-primary",  "bi-layers-fill text-primary",            "Kosti, zuby, svaly",             "calcium"),
+        ("Železo (Fe)",  micros.get("iron",      0)|round(1), 18,  "mg", "bg-danger",   "bi-droplet-fill text-danger",            "Červené krvinky, kyslík",        "iron"),
+        ("Draslík (K)",  micros.get("potassium", 0)|int,     4700, "mg", "bg-success",  "bi-cpu-fill text-success",               "Srdeční rytmus, svaly",          "potassium"),
+        ("Hořčík (Mg)",  micros.get("magnesium", 0)|int,      420, "mg", "bg-warning",  "bi-lightning-charge-fill text-warning",  "Nervy, energetický metabolismus","magnesium"),
+        ("Fosfor (P)",   micros.get("phosphorus",0)|int,     1250, "mg", "bg-secondary","bi-record-circle text-secondary",        "Kosti, buněčná energie",         "phosphorus"),
+      ] %}
+      {% for label, val, dv, unit, bar_cls, icon_cls, desc, nkey in mineral_items %}
+      <div class="col-12 col-md-6 col-lg-4">
+        <div class="card border-0 shadow-sm h-100 nutrient-row"
+             role="button" title="Klikni pro rozpis"
+             data-bs-toggle="modal" data-bs-target="#nutrientModal"
+             data-nutrient="{{ nkey }}" data-label="{{ label }}" data-unit="{{ unit }}">
+          <div class="card-body p-2 d-flex flex-column">
+            <div class="d-flex justify-content-between align-items-start mb-1">
+              <div>
+                <span class="fw-semibold small"><i class="bi {{ icon_cls }} me-1"></i>{{ label }}</span>
+                <div class="text-muted" style="font-size:.7rem;">{{ desc }}</div>
+              </div>
+              <span class="fw-bold">{{ val | int }}<span class="text-muted fw-normal small ms-1">{{ unit }}</span></span>
+            </div>
+            <div class="progress mt-auto" style="height:7px;">
+              {% set pct = [(val / dv * 100) | round(0) | int, 100] | min %}
+              <div class="progress-bar {{ bar_cls }}" style="width:{{ pct }}%"></div>
+            </div>
+            <div class="text-muted mt-1" style="font-size:.7rem;">{{ pct }} % DDD · max {{ dv }} {{ unit }}</div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Odkaz na recepty -->
+<div class="card border-success border-opacity-50 mb-4">
+  <div class="card-body d-flex align-items-center justify-content-between py-3 px-4">
+    <div>
+      <i class="bi bi-journal-richtext text-success fs-4 me-2"></i>
+      <span class="fw-semibold">Zdravé recepty</span>
+      <span class="text-muted small ms-2">– 10 česky zaměřených receptů s filtry a postupy</span>
+    </div>
+    <a href="{{ url_for('recipes.index') }}" class="btn btn-success btn-sm">
+      <i class="bi bi-arrow-right-circle"></i> Zobrazit recepty
+    </a>
+  </div>
+</div>
+
+<!-- ── Breakdown Modal ────────────────────────────────────────────────────── -->
+
+{% endif %}
+
+<!-- Nutrient Breakdown Modal – always present (makra = non-premium too) -->
+<div class="modal fade" id="nutrientModal" tabindex="-1" aria-labelledby="nutrientModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="nutrientModalLabel">
+          <i class="bi bi-bar-chart-fill me-2"></i><span id="nModalTitle">Rozpad živiny</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="nModalBody">
+        <p class="text-muted text-center small">Načítám data&hellip;</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Zavřít</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // ── Jinja → JS data ───────────────────────────────────────────────────────
+  window.DASH_TOTALS = {{ totals   | tojson }};
+  window.TODAY_DATE  = {{ day      | tojson }};
+  window.LOG_MEALS   = {{ log.meals| tojson }};
+
+  // ── Init charts ───────────────────────────────────────────────────────────
+  document.addEventListener("DOMContentLoaded", () => {
+    initBalanceChart(DASH_TOTALS);
+    loadHistoryChart("historyChart");
+    initFoodSearch();
+    initNutrientModal();
+  });
+
+  // ── Food autocomplete (lokál + Open Food Facts) ──────────────────────────
+  function initFoodSearch() {
+    document.querySelectorAll(".food-search-wrap").forEach(wrap => {
+      const input         = wrap.querySelector(".food-search-input");
+      const hiddenId      = wrap.querySelector(".food-id-input");
+      const hiddenName    = wrap.querySelector(".food-name-input");
+      const hiddenKcal    = wrap.querySelector(".food-kcal-input");
+      const hiddenProtein = wrap.querySelector(".food-protein-input");
+      const hiddenCarbs   = wrap.querySelector(".food-carbs-input");
+      const hiddenFat     = wrap.querySelector(".food-fat-input");
+      const hiddenFiber      = wrap.querySelector(".food-fiber-input");
+      const hiddenSugars     = wrap.querySelector(".food-sugars-input");
+      const hiddenSatFat     = wrap.querySelector(".food-sat_fat-input");
+      const hiddenVitC       = wrap.querySelector(".food-vitamin_c-input");
+      const hiddenVitB12     = wrap.querySelector(".food-vitamin_b12-input");
+      const hiddenSodium     = wrap.querySelector(".food-sodium-input");
+      const hiddenCalcium    = wrap.querySelector(".food-calcium-input");
+      const hiddenIron       = wrap.querySelector(".food-iron-input");
+      const hiddenPotassium  = wrap.querySelector(".food-potassium-input");
+      const hiddenMagnesium  = wrap.querySelector(".food-magnesium-input");
+      const hiddenPhosphorus = wrap.querySelector(".food-phosphorus-input");
+      const dropdown      = wrap.querySelector(".food-dropdown");
+      let debounceTimer;
+
+      function clearSelection() {
+        hiddenId.value      = "";
+        if (hiddenName)    hiddenName.value    = "";
+        if (hiddenKcal)    hiddenKcal.value    = "";
+        if (hiddenProtein) hiddenProtein.value = "";
+        if (hiddenCarbs)   hiddenCarbs.value   = "";
+        if (hiddenFat)     hiddenFat.value     = "";
+        [hiddenFiber,hiddenSugars,hiddenSatFat,hiddenVitC,hiddenVitB12,
+         hiddenSodium,hiddenCalcium,hiddenIron,hiddenPotassium,hiddenMagnesium,hiddenPhosphorus]
+          .forEach(el => { if (el) el.value = ""; });
+      }
+
+      function selectFood(f) {
+        input.value         = f.name;
+        hiddenId.value      = f.id || "";
+        if (hiddenName)    hiddenName.value    = f.name;
+        if (hiddenKcal)    hiddenKcal.value    = f.kcal;
+        if (hiddenProtein) hiddenProtein.value = f.protein;
+        if (hiddenCarbs)   hiddenCarbs.value   = f.carbs;
+        if (hiddenFat)     hiddenFat.value     = f.fat;
+        if (hiddenFiber)      hiddenFiber.value      = f.fiber      ?? 0;
+        if (hiddenSugars)     hiddenSugars.value     = f.sugars     ?? 0;
+        if (hiddenSatFat)     hiddenSatFat.value     = f.sat_fat    ?? 0;
+        if (hiddenVitC)       hiddenVitC.value       = f.vitamin_c  ?? 0;
+        if (hiddenVitB12)     hiddenVitB12.value     = f.vitamin_b12 ?? 0;
+        if (hiddenSodium)     hiddenSodium.value     = f.sodium     ?? 0;
+        if (hiddenCalcium)    hiddenCalcium.value    = f.calcium    ?? 0;
+        if (hiddenIron)       hiddenIron.value       = f.iron       ?? 0;
+        if (hiddenPotassium)  hiddenPotassium.value  = f.potassium  ?? 0;
+        if (hiddenMagnesium)  hiddenMagnesium.value  = f.magnesium  ?? 0;
+        if (hiddenPhosphorus) hiddenPhosphorus.value = f.phosphorus ?? 0;
+        dropdown.style.display = "none";
+      }
+
+      input.addEventListener("input", () => {
+        clearTimeout(debounceTimer);
+        clearSelection();
+        const q = input.value.trim();
+        dropdown.innerHTML = "";
+        if (q.length < 2) { dropdown.style.display = "none"; return; }
+
+        // Zobraz loading
+        dropdown.innerHTML = `<div class="list-group-item text-muted small py-1">
+          <i class="bi bi-hourglass-split me-1"></i>Hledám…</div>`;
+        dropdown.style.display = "block";
+
+        debounceTimer = setTimeout(() => {
+          fetch(`/api/food_search?q=${encodeURIComponent(q)}`)
+            .then(r => r.json())
+            .then(data => {
+              dropdown.innerHTML = "";
+              if (!data.length) {
+                dropdown.innerHTML = `<div class="list-group-item text-muted small py-1 fst-italic">
+                  Nic nenalezeno.</div>`;
+                dropdown.style.display = "block";
+                return;
+              }
+              data.forEach(f => {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "list-group-item list-group-item-action small py-1";
+                const badge = f.source === "usda"
+                  ? `<span class="badge bg-info text-dark ms-1" style="font-size:.6rem">USDA</span>`
+                  : ``;
+                btn.innerHTML = `<strong>${f.name}</strong>${badge}
+                  <span class="text-muted ms-2">${f.kcal} kcal &middot;
+                    B:&nbsp;${f.protein}g S:&nbsp;${f.carbs}g T:&nbsp;${f.fat}g</span>`;
+                btn.addEventListener("click", () => selectFood(f));
+                dropdown.appendChild(btn);
+              });
+              dropdown.style.display = "block";
+            })
+            .catch(() => { dropdown.style.display = "none"; });
+        }, 300);
+      });
+
+      // Zavři dropdown po kliknutí mimo
+      document.addEventListener("click", e => {
+        if (!wrap.contains(e.target)) dropdown.style.display = "none";
+      });
+    });
+  }
+
+  // ── Per-food formulas for each nutrient key ───────────────────────────────
+  const NUTRIENT_FN = {
+    kcal:       i => i.kcal    * i.grams / 100,
+    protein:    i => i.protein * i.grams / 100,
+    carbs:      i => i.carbs   * i.grams / 100,
+    fat:        i => i.fat     * i.grams / 100,
+    sugars:     i => i.carbs   * i.grams / 100 * 0.35,
+    fiber:      i => i.kcal    * i.grams / 100 * 0.025,
+    unsat_fat:  i => i.fat     * i.grams / 100 * 0.65,
+    sat_fat:    i => i.fat     * i.grams / 100 * 0.35,
+    vitamin_c:  i => i.carbs   * i.grams / 100 * 0.18,
+    vitamin_b12:i => i.protein * i.grams / 100 * 0.006,
+    sodium:     i => i.kcal    * i.grams / 100 * 0.45,
+    calcium:    i => i.kcal    * i.grams / 100 * 0.10,
+    iron:       i => i.kcal    * i.grams / 100 * 0.006,
+    potassium:  i => i.kcal    * i.grams / 100 * 0.35,
+    magnesium:  i => i.kcal    * i.grams / 100 * 0.048,
+    phosphorus: i => i.kcal    * i.grams / 100 * 0.10,
+  };
+
+  // ── Nutrient breakdown modal ──────────────────────────────────────────────
+  function initNutrientModal() {
+    const modal = document.getElementById("nutrientModal");
+    if (!modal) return;
+    modal.addEventListener("show.bs.modal", e => {
+      const trigger  = e.relatedTarget;
+      if (!trigger) return;
+      const nutrient = trigger.dataset.nutrient;
+      const label    = trigger.dataset.label  || nutrient;
+      const unit     = trigger.dataset.unit   || "";
+      document.getElementById("nModalTitle").textContent = label + " – zdrojové potraviny";
+
+      // Flatten all meal items
+      const allItems = Object.values(window.LOG_MEALS || {}).flat();
+
+      // Compute per-item contribution, then group by food name
+      const fn = NUTRIENT_FN[nutrient];
+      if (!fn) {
+        document.getElementById("nModalBody").innerHTML =
+          `<p style="color:var(--nt-muted)">Pro tuto živinu není k dispozici rozpad.</p>`;
+        return;
+      }
+
+      const grouped = {};
+      allItems.forEach(item => {
+        const val = fn(item);
+        if (!grouped[item.name]) grouped[item.name] = 0;
+        grouped[item.name] += val;
+      });
+
+      // Sort descending
+      const sorted = Object.entries(grouped)
+        .map(([name, val]) => ({ name, val: Math.round(val * 10) / 10 }))
+        .filter(x => x.val > 0)
+        .sort((a, b) => b.val - a.val);
+
+      if (!sorted.length) {
+        document.getElementById("nModalBody").innerHTML =
+          `<p style="color:var(--nt-muted)">Dnes jsi zatím nezanesl/a žádné potraviny.</p>`;
+        return;
+      }
+
+      const total = sorted.reduce((s, x) => s + x.val, 0);
+      const BAR_COLORS = ['#ffc107','#adb5bd','#6ea8fe','#0d6efd','#0d6efd'];
+      const MEDALS = ['\ud83e\udd47','\ud83e\udd48','\ud83e\udd49'];
+      let html = `<p style="font-size:.83rem;color:var(--nt-muted);margin-bottom:.85rem">
+        Celkem: <strong style="color:var(--nt-text)">${Math.round(total*10)/10} ${unit}</strong>
+        &nbsp;&middot;&nbsp; Seřazeno od největšího příspěvku.
+      </p>`;
+      sorted.forEach((row, idx) => {
+        const pct  = total > 0 ? Math.round(row.val / total * 100) : 0;
+        const bar  = BAR_COLORS[Math.min(idx, BAR_COLORS.length-1)];
+        const icon = idx < 3 ? MEDALS[idx] : '&bull;';
+        html += `
+        <div style="padding:.55rem 0;border-bottom:1px solid var(--nt-card-border)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
+            <span style="font-weight:600;font-size:.88rem;color:var(--nt-text)">${icon} ${row.name}</span>
+            <span style="font-size:.8rem;color:var(--nt-muted)">${row.val}&thinsp;${unit}&ensp;(${pct}%)</span>
+          </div>
+          <div style="height:7px;background:var(--nt-card-border);border-radius:4px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${bar};border-radius:4px;transition:width .6s"></div>
+          </div>
+        </div>`;
+      });
+      document.getElementById("nModalBody").innerHTML = html;
+    });
+  }
+</script>
+{% endblock %}

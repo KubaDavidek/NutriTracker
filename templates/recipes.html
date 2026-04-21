@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}Zdravé recepty – NutriTracker{% endblock %}
+
+{% block content %}
+
+<div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+  <div>
+    <h3 class="mb-0"><i class="bi bi-journal-richtext text-warning me-2"></i>Zdravé recepty</h3>
+    <div class="text-muted small mt-1">{{ recipes | length }} z {{ total_count }} receptů</div>
+  </div>
+  <span class="badge bg-warning text-dark ms-auto"><i class="bi bi-star-fill"></i> Premium</span>
+</div>
+
+<!-- ── Filtry ──────────────────────────────────────────────────────────── -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-3">
+    <form method="GET" action="{{ url_for('recipes.index') }}" class="row g-2 align-items-end">
+      <div class="col-sm-4">
+        <label class="form-label small fw-semibold mb-1">
+          <i class="bi bi-tag me-1"></i>Kategorie
+        </label>
+        <select class="form-select form-select-sm" name="category">
+          <option value="">— všechny —</option>
+          {% for cat in categories %}
+            <option value="{{ cat }}" {% if cat == cat_filter %}selected{% endif %}>{{ cat }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-4">
+        <label class="form-label small fw-semibold mb-1">
+          <i class="bi bi-bookmark me-1"></i>Vlastnost / tag
+        </label>
+        <select class="form-select form-select-sm" name="tag">
+          <option value="">— všechny —</option>
+          {% for tag in all_tags %}
+            <option value="{{ tag }}" {% if tag == tag_filter %}selected{% endif %}>{{ tag }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-auto d-flex gap-2">
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-funnel"></i> Filtrovat
+        </button>
+        {% if cat_filter or tag_filter %}
+        <a href="{{ url_for('recipes.index') }}" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-x"></i> Zrušit
+        </a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if not recipes %}
+<div class="alert alert-info">
+  <i class="bi bi-info-circle me-2"></i>
+  Žádné recepty neodpovídají zvoleným filtrům.
+  <a href="{{ url_for('recipes.index') }}" class="alert-link">Zobrazit vše</a>.
+</div>
+{% endif %}
+
+<!-- ── Mřížka receptů ─────────────────────────────────────────────────── -->
+<div class="row g-4">
+  {% for r in recipes %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100 border-0 shadow-sm recipe-card">
+
+      <!-- Barevná hlavička podle kategorie -->
+      <div class="card-header d-flex justify-content-between align-items-center
+                  {% if r.category == 'Polévky' %}bg-info bg-opacity-10
+                  {% elif r.category == 'Snídaně' %}bg-warning bg-opacity-10
+                  {% elif r.category == 'Saláty' %}bg-success bg-opacity-10
+                  {% elif r.category == 'Svačiny' %}bg-secondary bg-opacity-10
+                  {% else %}bg-primary bg-opacity-10{% endif %}">
+        <span class="fw-bold">{{ r.name }}</span>
+        <span class="badge bg-success text-white">{{ r.kcal }} kcal</span>
+      </div>
+
+      <div class="card-body d-flex flex-column">
+
+        <!-- Meta info -->
+        <div class="d-flex flex-wrap gap-1 mb-3">
+          <span class="badge bg-light text-dark border">
+            <i class="bi bi-tag me-1"></i>{{ r.category }}
+          </span>
+          <span class="badge bg-light text-dark border">
+            <i class="bi bi-clock me-1"></i>{{ r.time }}
+          </span>
+          <span class="badge bg-light text-dark border">
+            <i class="bi bi-people me-1"></i>{{ r.servings }} {% if r.servings == 1 %}porce{% else %}porce{% endif %}
+          </span>
+          {% for tag in r.tags %}
+            <span class="badge
+              {% if tag in ['vegan', 'vegetariánské'] %}nt-tag-vegan
+                {% elif tag in ['bez lepku', 'bezlepkové'] %}nt-tag-gluten
+                {% elif 'bílkovin' in tag %}nt-tag-protein
+                {% elif 'vláknin' in tag %}nt-tag-fiber
+                {% elif 'omega' in tag %}nt-tag-omega
+                {% elif 'antioxidant' in tag %}nt-tag-antioxidant
+                {% elif 'probiotik' in tag %}nt-tag-probiotic
+                {% elif 'česká' in tag or 'klasik' in tag %}nt-tag-czech
+                {% elif 'imunit' in tag %}nt-tag-immune
+                {% else %}nt-tag-default
+                {% endif %}
+              ">{{ tag }}</span>
+          {% endfor %}
+        </div>
+
+        <!-- Ingredience -->
+        <div class="mb-3">
+          <div class="small fw-semibold text-muted mb-2">
+            <i class="bi bi-list-check me-1"></i>Ingredience
+          </div>
+          <ul class="list-unstyled mb-0 small">
+            {% for ing in r.ingredients %}
+              <li class="d-flex align-items-start gap-1 mb-1">
+                <i class="bi bi-check2-circle text-success flex-shrink-0 mt-1"></i>
+                <span>{{ ing }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+
+        <!-- Postup -->
+        <div class="mt-auto">
+          <div class="accordion accordion-flush" id="acc_{{ loop.index }}">
+            <div class="accordion-item border rounded">
+              <h2 class="accordion-header">
+                <button class="accordion-button collapsed py-2 small fw-semibold"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#step_{{ loop.index }}">
+                  <i class="bi bi-card-checklist me-2 text-primary"></i>Postup přípravy
+                </button>
+              </h2>
+              <div id="step_{{ loop.index }}" class="accordion-collapse collapse"
+                   data-bs-parent="#acc_{{ loop.index }}">
+                <div class="accordion-body small py-2">
+                  {{ r.instructions | replace('\n', '<br>') | safe }}
+                  {% if r.tip %}
+                  <div class="mt-2 p-2 rounded"
+                       style="background:rgba(25,135,84,.08); border-left:3px solid #198754;">
+                    <i class="bi bi-lightbulb-fill text-success me-1"></i>
+                    <em class="text-success">{{ r.tip }}</em>
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if not recipes %}
+<!-- Prázdný stav -->
+{% else %}
+<div class="text-center text-muted small mt-4 pb-2">
+  <i class="bi bi-check-all me-1"></i>Zobrazeno {{ recipes | length }} receptů · seřazeno od nejméně kalorických
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block head %}
+<style>
+  .recipe-card {
+    transition: transform .15s, box-shadow .15s;
+  }
+  .recipe-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 .5rem 1.5rem rgba(0,0,0,.15) !important;
+  }
+</style>
+{% endblock %}

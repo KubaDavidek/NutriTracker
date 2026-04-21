@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Poradce – klienti{% endblock %}
+
+{% block content %}
+
+<!-- ── Hlavička ─────────────────────────────────────────────────────────────── -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+  <div>
+    <h3 class="mb-0"><i class="bi bi-people-fill text-success"></i> Moji klienti</h3>
+    <div class="text-muted small mt-1">
+      {% set total = clients | length %}
+      {% set premium_count = clients | selectattr("is_premium") | list | length %}
+      Celkem <strong>{{ total }}</strong> klient{% if total == 1 %}{% elif total in [2,3,4] %}i{% else %}ů{% endif %},
+      z toho <strong>{{ premium_count }}</strong> Premium
+    </div>
+  </div>
+  <button class="btn btn-outline-success btn-sm" type="button"
+          data-bs-toggle="collapse" data-bs-target="#addClientPanel">
+    <i class="bi bi-person-plus-fill"></i> Přidat klienta
+  </button>
+</div>
+
+<!-- ── Přidat klienta (collapse) ─────────────────────────────────────────────── -->
+<div class="collapse mb-4" id="addClientPanel">
+  <div class="card border-success">
+    <div class="card-header bg-success bg-opacity-10 fw-semibold">
+      <i class="bi bi-person-plus text-success"></i> Přidat klienta podle e-mailu
+    </div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('advisor.assign_client') }}"
+            class="row g-2 align-items-end">
+        <div class="col-md-7">
+          <label class="form-label small mb-1">E-mail klienta <span class="text-muted">(musí být již registrován jako uživatel)</span></label>
+          <input type="email" class="form-control" name="client_email"
+                 placeholder="klient@email.cz" required autofocus/>
+        </div>
+        <div class="col-md-3">
+          <button type="submit" class="btn btn-success w-100">
+            <i class="bi bi-plus-circle-fill"></i> Přidat
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── Čekající pozvánky ──────────────────────────────────────────────────── -->
+{% if pending_clients %}
+<div class="card border-warning mb-4">
+  <div class="card-header fw-semibold bg-warning bg-opacity-10">
+    <i class="bi bi-hourglass-split text-warning"></i> Čekající pozvánky
+    <span class="badge bg-warning text-dark ms-2">{{ pending_clients | length }}</span>
+  </div>
+  <div class="card-body p-0">
+    <ul class="list-group list-group-flush">
+      {% for pc in pending_clients %}
+      <li class="list-group-item d-flex align-items-center justify-content-between gap-2">
+        <span class="text-muted small">
+          <i class="bi bi-person-circle me-1"></i>{{ pc.email }}
+          <span class="ms-2 badge bg-secondary">čeká na přijetí</span>
+        </span>
+        <form method="POST" action="{{ url_for('advisor.remove_client') }}"
+              onsubmit="return confirm('Zrušit pozvánku pro {{ pc.email }}?')">
+          <input type="hidden" name="client_id" value="{{ pc.id }}">
+          <button type="submit" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-x-circle"></i> Zrušit pozvánku
+          </button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Seznam klientů ──────────────────────────────────────────────────────── -->
+{% if clients %}
+<div class="row g-3">
+  {% for client in clients %}
+  {% set kcal_pct = [(client.today_kcal / client.kcal_target * 100) | round(0) | int, 100] | min %}
+  {% set bar_col  = "success" if kcal_pct <= 100 else "danger" %}
+
+  <div class="col-md-4">
+    <div class="card h-100 border-0 shadow-sm">
+      <!-- Barevný pruh nahoře -->
+      <div class="progress" style="height:4px;border-radius:8px 8px 0 0">
+        <div class="progress-bar bg-{{ bar_col }}" style="width:{{ kcal_pct }}%"></div>
+      </div>
+      <div class="card-body d-flex flex-column gap-2 pt-3">
+
+        <!-- Jméno + odznaky -->
+        <div class="d-flex align-items-start justify-content-between">
+          <div>
+            <div class="fw-semibold" style="word-break:break-all">
+              <i class="bi bi-person-circle text-secondary me-1"></i>{{ client.email }}
+            </div>
+            <div class="mt-1 d-flex gap-1 flex-wrap">
+              {% if client.is_premium %}
+                <span class="badge bg-warning text-dark"><i class="bi bi-star-fill"></i> Premium</span>
+              {% else %}
+                <span class="badge bg-secondary">Základní</span>
+              {% endif %}
+              {% if client.unread > 0 %}
+                <span class="badge bg-danger"><i class="bi bi-envelope-fill"></i> {{ client.unread }} nepřečt.</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Dnešní kcal přehled -->
+        <div class="mt-1">
+          <div class="d-flex justify-content-between small text-muted mb-1">
+            <span><i class="bi bi-fire"></i> Dnes přijato</span>
+            <span>{{ client.today_kcal }} / {{ client.kcal_target }} kcal</span>
+          </div>
+          <div class="progress" style="height:6px">
+            <div class="progress-bar bg-{{ bar_col }}"
+                 style="width:{{ kcal_pct }}%"></div>
+          </div>
+          <div class="text-muted mt-1" style="font-size:.7rem">{{ kcal_pct }} % denního cíle</div>
+        </div>
+
+        <!-- Akce -->
+        <div class="d-flex gap-2 mt-auto pt-2">
+          <a href="{{ url_for('advisor.client_detail', client_id=client.id) }}"
+             class="btn btn-sm btn-success flex-grow-1">
+            <i class="bi bi-eye-fill"></i> Zobrazit detail
+          </a>
+          <button type="button" class="btn btn-sm btn-outline-danger"
+                  title="Odebrat klienta"
+                  onclick="confirmRemove('{{ client.id }}','{{ client.email }}')">
+            <i class="bi bi-person-dash"></i>
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<!-- Prázdný stav -->
+<div class="text-center py-5">
+  <i class="bi bi-people display-3 text-muted opacity-50"></i>
+  <p class="mt-3 text-muted">Zatím nemáte žádné klienty.</p>
+  <button class="btn btn-success" type="button"
+          data-bs-toggle="collapse" data-bs-target="#addClientPanel">
+    <i class="bi bi-person-plus-fill"></i> Přidat prvního klienta
+  </button>
+</div>
+{% endif %}
+
+<!-- ── Formulář pro odebrání klienta (skrytý) ──────────────────────────────── -->
+<form id="removeForm" method="POST" action="{{ url_for('advisor.remove_client') }}" class="d-none">
+  <input type="hidden" name="client_id" id="removeClientId">
+</form>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function confirmRemove(clientId, email) {
+  if (confirm('Opravdu odebrat klienta ' + email + ' z portfolia?')) {
+    document.getElementById('removeClientId').value = clientId;
+    document.getElementById('removeForm').submit();
+  }
+}
+</script>
+{% endblock %}

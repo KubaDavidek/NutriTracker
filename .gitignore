@@ -1,0 +1,10 @@
+.venv/
+.venv-1/
+.vscode/
+
+.env
+
+__pycache__/
+*.pyc
+
+nutrient.db

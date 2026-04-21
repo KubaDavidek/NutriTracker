@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Historie – NutriTracker{% endblock %}
+
+{% block content %}
+<h3 class="mb-4">
+  <i class="bi bi-graph-up text-success"></i> Historie – posledních 7 dní
+</h3>
+
+<!-- Graf liniový / sloupcový -->
+<div class="card mb-4">
+  <div class="card-header bg-transparent fw-semibold">
+    Kalorie za 7 dní
+  </div>
+  <div class="card-body">
+    <canvas id="historyPageChart" style="max-height:280px;"></canvas>
+  </div>
+</div>
+
+<!-- Tabulka -->
+<div class="card">
+  <div class="card-header bg-transparent fw-semibold">Přehled</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Datum</th>
+          <th class="text-end">Příjem (kcal)</th>
+          <th class="text-end">Bílkoviny (g)</th>
+          <th class="text-end">Sacharidy (g)</th>
+          <th class="text-end">Tuky (g)</th>
+          <th class="text-end">Výdej (kcal)</th>
+          <th class="text-end">Bilance</th>
+          <th class="text-end">Detail</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in history_data %}
+        <tr>
+          <td>
+            <a href="{{ url_for('dashboard.index', date=row.date) }}">
+              {{ row.date }}
+            </a>
+          </td>
+          <td class="text-end fw-semibold text-success">{{ row.totals.kcal }}</td>
+          <td class="text-end">{{ row.totals.protein }}</td>
+          <td class="text-end">{{ row.totals.carbs }}</td>
+          <td class="text-end">{{ row.totals.fat }}</td>
+          <td class="text-end text-warning">{{ row.totals.calories_burned }}</td>
+          <td class="text-end {% if row.totals.balance > 0 %}text-danger{% else %}text-success{% endif %}">
+            {{ row.totals.balance }}
+          </td>
+          <td class="text-end">
+            <a href="{{ url_for('dashboard.index', date=row.date) }}"
+               class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-eye"></i>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.HISTORY_DATA = {{ history_data | tojson }};
+
+document.addEventListener("DOMContentLoaded", () => {
+  const labels  = HISTORY_DATA.map(d => d.date);
+  const intakes = HISTORY_DATA.map(d => d.totals.kcal);
+  const burned  = HISTORY_DATA.map(d => d.totals.calories_burned);
+
+  const histChart = new Chart(document.getElementById("historyPageChart"), {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        {
+          label:           "Příjem (kcal)",
+          data:            intakes,
+          backgroundColor: "rgba(13, 110, 253, 0.75)",
+          borderColor:     "rgba(13, 110, 253, 1)",
+          borderWidth:     0,
+          borderRadius: 4,
+        },
+        {
+          label:           "Výdej (kcal)",
+          data:            burned,
+          backgroundColor: "rgba(13, 202, 240, 0.75)",
+          borderColor:     "rgba(13, 202, 240, 1)",
+          borderWidth:     0,
+          borderRadius: 4,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: "top", labels: { color: _labelColor() } } },
+      scales: {
+        x: { grid: { color: _gridColor() }, ticks: { color: _tickColor() } },
+        y: { beginAtZero: true, grid: { color: _gridColor() }, ticks: { color: _tickColor() } },
+      },
+    },
+  });
+  if (typeof _ntCharts !== 'undefined') _ntCharts.push(histChart);
+});
+</script>
+{% endblock %}
