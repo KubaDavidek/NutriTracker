@@ -205,7 +205,11 @@ def load_table(path: str) -> List[Dict]:
         return _fetch_all("SELECT * FROM advisor_clients")
         # status: 'pending' | 'accepted'
     if path == WEIGHT_FILE:
-        return _fetch_all("SELECT * FROM weight_entries")
+        rows = _fetch_all("SELECT * FROM weight_entries")
+        for r in rows:
+            r["weight"] = float(r["weight"]) if r.get("weight") is not None else None
+            r["date"] = str(r["date"]) if r.get("date") is not None else None
+        return rows
     if path == LOGS_FILE:
         return _fetch_all("SELECT * FROM logs")
     return []
