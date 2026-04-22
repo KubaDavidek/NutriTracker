@@ -455,6 +455,10 @@ def get_user_settings(user_id: str) -> Dict:
     return {k: (s[k] if s.get(k) is not None else defaults[k]) for k in defaults}
 
 
+def set_goal_weight(user_id: str, goal: float) -> None:
+    _execute("UPDATE users SET goal_weight=%s WHERE id=%s", (goal, user_id))
+
+
 def save_user_settings(user_id: str, settings: Dict) -> None:
     _execute(
         "UPDATE users SET age=%s, weight=%s, height=%s, gender=%s, activity=%s, goal=%s, "
