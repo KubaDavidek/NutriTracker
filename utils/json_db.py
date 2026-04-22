@@ -441,6 +441,7 @@ def _default_settings() -> Dict:
         "gender": "male", "activity": 1.55, "goal": "maintain",
         "kcal_target": 2000, "protein_target": 150,
         "carbs_target": 250, "fat_target": 70, "water_goal_ml": 2500,
+        "goal_weight": None,
     }
 
 
