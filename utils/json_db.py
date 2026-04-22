@@ -97,7 +97,7 @@ def _user_from_row(row: Dict) -> Dict:
         "carbs_target":   row.get("carbs_target", 250),
         "fat_target":     row.get("fat_target", 70),
         "water_goal_ml":  row.get("water_goal_ml", 2500),
-        "goal_weight":    row.get("goal_weight"),
+        "goal_weight":    float(row["goal_weight"]) if row.get("goal_weight") is not None else None,
     }
     return {
         "id":            row["id"],
