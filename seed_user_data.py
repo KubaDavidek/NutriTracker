@@ -3,7 +3,7 @@ seed_user_data.py – Naplní 14 dní reálných jídel pro zadaný email.
 Spuštění: python seed_user_data.py
 """
 
-import os, uuid
+import os, uuid, random
 from datetime import date, timedelta
 import psycopg2
 import psycopg2.extras
@@ -86,18 +86,11 @@ VECERE = [
     ("Rybí filet s vařenými bramborami",115, 12.0, 12.0, 3.0, 1.5, 1.0,  0.8, 7.0,  0.5, 120, 20,  0.7, 350, 22, 130),
 ]
 
-AKTIVITY = [
-    ("Běh (30 min)", 300),
-    ("Chůze (45 min)", 180),
-    ("Kolo (45 min)", 350),
-    ("Posilovna (60 min)", 400),
-    ("Plavání (30 min)", 280),
-    ("Jóga (45 min)", 150),
-    ("Intervalový trénink HIIT (30 min)", 420),
-]
+# Kcal spálené plavání: cca 7 kcal/min
+PLAVANI_KCAL_PER_MIN = 7
 
-# Cílové kcal na den a rozložení mezi jídla
-TARGET_KCAL = 2600
+# Cílové kcal na den – náhodně 2300–2800 (nastaví se per-day)
+TARGET_KCAL = 2600  # fallback
 SLOT_SHARE = {
     "snidane":  0.23,   # ~600 kcal
     "svacina":  0.10,   # ~260 kcal
@@ -118,7 +111,7 @@ today = date.today()
 regular_cur = cnx.cursor()
 
 # Smaž existující logy pro toto období (nejdřív child tabulky, pak logs)
-start_date = str(today - timedelta(days=13))
+start_date = str(today - timedelta(days=6))
 end_date   = str(today)
 regular_cur.execute(
     "SELECT id FROM logs WHERE user_id = %s AND date >= %s AND date <= %s",
@@ -137,9 +130,10 @@ if old_log_ids:
 print(f"  Smazány staré záznamy ({len(old_log_ids)} dní) od {start_date} do {end_date}")
 
 inserted_days = 0
+random.seed(42)
 
-for day_offset in range(14):
-    day_date = today - timedelta(days=13 - day_offset)
+for day_offset in range(7):
+    day_date = today - timedelta(days=6 - day_offset)
     day_str = str(day_date)
     d = day_offset
 
@@ -149,6 +143,9 @@ for day_offset in range(14):
         "INSERT INTO logs (id, user_id, date) VALUES (%s, %s, %s)",
         (log_id, user_id, day_str)
     )
+
+    # Náhodný cíl kcal pro tento den (2300–2800)
+    TARGET_KCAL = random.randint(230, 280) * 10
 
     # Přidej jídla – gramy vypočítány dynamicky podle TARGET_KCAL
     foods_by_slot = {
@@ -191,20 +188,21 @@ for day_offset in range(14):
         (str(uuid.uuid4()), log_id, water_ml)
     )
 
-    # Aktivita každý druhý den
-    if d % 2 == 0:
-        akt = AKTIVITY[d % len(AKTIVITY)]
-        regular_cur.execute(
-            "INSERT INTO activities (id, log_id, name, calories_burned) VALUES (%s, %s, %s, %s)",
-            (str(uuid.uuid4()), log_id, akt[0], akt[1])
-        )
+    # Plavání každý den – délka 20–80 minut (různá každý den)
+    swim_minutes = random.randint(2, 8) * 10  # 20, 30, 40, 50, 60, 70 nebo 80
+    swim_kcal = swim_minutes * PLAVANI_KCAL_PER_MIN
+    swim_name = f"Plavání ({swim_minutes} min)"
+    regular_cur.execute(
+        "INSERT INTO activities (id, log_id, name, calories_burned) VALUES (%s, %s, %s, %s)",
+        (str(uuid.uuid4()), log_id, swim_name, swim_kcal)
+    )
 
     # Výpočet denního příjmu pro výpis
     total_kcal = sum(
         food[1] * grams / 100
         for _, food, grams in meals_to_insert
     )
-    print(f"  ✓ {day_str}  ~{round(total_kcal)} kcal  voda={water_ml} ml")
+    print(f"  ✓ {day_str}  ~{round(total_kcal)} kcal (cíl {TARGET_KCAL})  plavání={swim_minutes} min  voda={water_ml} ml")
     inserted_days += 1
 
 cnx.commit()
