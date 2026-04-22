@@ -9,8 +9,7 @@ from flask import (Blueprint, render_template, request,
 from utils.auth_utils import login_required, user_required
 from utils.json_db import (WEIGHT_FILE, USERS_FILE,
                             find_all, insert, delete_one,
-                            update_one, get_user_settings, save_user_settings,
-                            _execute)
+                            update_one, get_user_settings, save_user_settings)
 
 weight_bp = Blueprint("weight", __name__)
 
@@ -116,8 +115,9 @@ def set_goal():
         flash("Zadej cílovou hmotnost v rozsahu 1–500 kg.", "danger")
         return redirect(url_for("weight.index"))
 
-    _execute("UPDATE users SET goal_weight=%s WHERE id=%s", (goal, uid))
-    # Vymaz cache nastaveni v session
+    settings = get_user_settings(uid)
+    settings["goal_weight"] = goal
+    save_user_settings(uid, settings)
     session.pop("settings_cache", None)
     flash(f"Cílová hmotnost nastavena na {goal} kg.", "success")
     return redirect(url_for("weight.index"))
